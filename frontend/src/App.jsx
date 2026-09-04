@@ -103,8 +103,37 @@ function LoadingState({ label = "Loading" }) {
   );
 }
 
-function SystemHeader({ health, onNavigate }) {
+function SystemHeader({ health, onNavigate, signals, incidents, onJumpToSignal, onJumpToIncident }) {
   const ok = health?.status === "ok";
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+
+  const q = query.trim().toLowerCase();
+  const matchedSignals = q
+    ? (signals || [])
+        .filter((s) =>
+          `${s.id} ${s.source} ${s.location || ""} ${s.description}`
+            .toLowerCase()
+            .includes(q)
+        )
+        .slice(0, 5)
+    : [];
+  const matchedIncidents = q
+    ? (incidents || [])
+        .filter((i) =>
+          `${i.id} ${i.title} ${i.location || ""} ${i.status}`
+            .toLowerCase()
+            .includes(q)
+        )
+        .slice(0, 5)
+    : [];
+  const hasResults = matchedSignals.length > 0 || matchedIncidents.length > 0;
+
+  const jump = (fn, id) => {
+    fn(id);
+    setQuery("");
+    setOpen(false);
+  };
 
   return (
     <header className="topbar">
@@ -116,12 +145,68 @@ function SystemHeader({ health, onNavigate }) {
         <span>SYNTRA</span>
       </button>
 
-      <div className="top-search">
+      <div className="top-search top-search--relative">
         <Icon name="search" />
         <input
-          placeholder="Search current view…"
-          aria-label="Search current view"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => query && setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setQuery("");
+              setOpen(false);
+            }
+            if (e.key === "Enter") {
+              const first = matchedSignals[0] || matchedIncidents[0];
+              if (first) {
+                if (matchedSignals[0] === first) jump(onJumpToSignal, first.id);
+                else jump(onJumpToIncident, first.id);
+              }
+            }
+          }}
+          placeholder="Search signals or incidents…"
+          aria-label="Search signals or incidents"
         />
+        {open && q && (
+          <div className="search-results">
+            {hasResults ? (
+              <>
+                {matchedSignals.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onMouseDown={() => jump(onJumpToSignal, s.id)}
+                  >
+                    <Icon name="sensors" />
+                    <span>
+                      <strong>{s.id}</strong>
+                      <em>{s.description}</em>
+                    </span>
+                  </button>
+                ))}
+                {matchedIncidents.map((i) => (
+                  <button
+                    key={i.id}
+                    type="button"
+                    onMouseDown={() => jump(onJumpToIncident, i.id)}
+                  >
+                    <Icon name="warning" />
+                    <span>
+                      <strong>{i.id}</strong>
+                      <em>{i.title}</em>
+                    </span>
+                  </button>
+                ))}
+              </>
+            ) : (
+              <div className="search-empty">No matches for "{query}"</div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="top-status">
@@ -914,9 +999,9 @@ function SignalForm({ onCreated }) {
   );
 }
 
-function SignalsPage({ data, refresh }) {
+function SignalsPage({ data, refresh, focusId }) {
   const [selectedId, setSelectedId] = useState(
-    data.signals[0]?.id || null
+    focusId || data.signals[0]?.id || null
   );
   const [query, setQuery] = useState("");
 
@@ -937,6 +1022,14 @@ function SignalsPage({ data, refresh }) {
       setSelectedId(data.signals[0].id);
     }
   }, [data.signals, selectedId]);
+
+  useEffect(() => {
+    if (focusId) {
+      setSelectedId(focusId);
+      setQuery("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId]);
 
   return (
     <div className="page">
@@ -1121,9 +1214,9 @@ function SignalDetail({ signal }) {
   );
 }
 
-function IncidentsPage({ data, refresh }) {
+function IncidentsPage({ data, refresh, focusId }) {
   const [selectedId, setSelectedId] = useState(
-    data.incidents[0]?.id || null
+    focusId || data.incidents[0]?.id || null
   );
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(null);
@@ -1144,6 +1237,14 @@ function IncidentsPage({ data, refresh }) {
       setSelectedId(filtered[0].id);
     }
   }, [filtered, selectedId]);
+
+  useEffect(() => {
+    if (focusId) {
+      setSelectedId(focusId);
+      setQuery("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId]);
 
   useEffect(() => {
     (async () => {
@@ -2024,6 +2125,14 @@ function HistoryPage({ data }) {
 }
 
 function Modal({ title, icon, onClose, children }) {
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
   return (
     <div
       className="modal-backdrop"
@@ -2216,10 +2325,22 @@ function App() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
+  const [focusSignalId, setFocusSignalId] = useState(null);
+  const [focusIncidentId, setFocusIncidentId] = useState(null);
 
   const navigate = (page) => {
     setActive(page);
     window.location.hash = page;
+  };
+
+  const jumpToSignal = (id) => {
+    setFocusSignalId(id);
+    navigate("signals");
+  };
+
+  const jumpToIncident = (id) => {
+    setFocusIncidentId(id);
+    navigate("incidents");
   };
 
   const refresh = useCallback(async () => {
@@ -2278,9 +2399,9 @@ function App() {
 
   const page =
     active === "incidents" ? (
-      <IncidentsPage data={data} refresh={refresh} />
+      <IncidentsPage data={data} refresh={refresh} focusId={focusIncidentId} />
     ) : active === "signals" ? (
-      <SignalsPage data={data} refresh={refresh} />
+      <SignalsPage data={data} refresh={refresh} focusId={focusSignalId} />
     ) : active === "agents" ? (
       <AgentsPage data={data} />
     ) : active === "analytics" ? (
@@ -2305,6 +2426,10 @@ function App() {
           health={data.health}
           active={active}
           onNavigate={navigate}
+          signals={data.signals}
+          incidents={data.incidents}
+          onJumpToSignal={jumpToSignal}
+          onJumpToIncident={jumpToIncident}
         />
 
         <main className="content">
