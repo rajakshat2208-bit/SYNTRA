@@ -36,11 +36,250 @@ const SEVERITY = {
   low: { cls: "low", icon: "check_circle" },
 };
 
+/**
+ * Self-contained inline SVG icon system. Deliberately replaces a
+ * Google-Fonts-ligature approach (Material Symbols) after confirming in a
+ * real deployed browser that the font request can fail, causing icon
+ * *names* to render as literal fallback text — e.g. "warning", "smart_toy",
+ * "hub" appearing as giant words instead of icons. Inline SVG has no
+ * external font dependency, so it cannot fail this way.
+ *
+ * Built from simple primitives (circles/rects/lines) rather than complex
+ * bezier paths wherever possible, since these are easy to reason about
+ * correctly without a way to visually preview them.
+ */
+const ICONS = {
+  dashboard: () => (
+    <>
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1.2" />
+      <rect x="13.5" y="3.5" width="7" height="7" rx="1.2" />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="1.2" />
+      <rect x="13.5" y="13.5" width="7" height="7" rx="1.2" />
+    </>
+  ),
+  warning: () => (
+    <>
+      <path d="M12 3.5 L21.5 20 H2.5 Z" strokeLinejoin="round" />
+      <line x1="12" y1="9.5" x2="12" y2="14" />
+      <circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none" />
+    </>
+  ),
+  sensors: () => (
+    <>
+      <circle cx="6" cy="18" r="1.4" fill="currentColor" stroke="none" />
+      <path d="M6 18 A8 8 0 0 0 14 10" />
+      <path d="M6 18 A12 12 0 0 0 18 6" />
+    </>
+  ),
+  smart_toy: () => (
+    <>
+      <rect x="5" y="8" width="14" height="11" rx="2.5" />
+      <line x1="12" y1="8" x2="12" y2="4.5" />
+      <circle cx="12" cy="3.5" r="1" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="13.5" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="13.5" r="1.1" fill="currentColor" stroke="none" />
+      <line x1="9" y1="17" x2="15" y2="17" />
+    </>
+  ),
+  leaderboard: () => (
+    <>
+      <rect x="4" y="12" width="4.5" height="8" rx="0.8" />
+      <rect x="10" y="6" width="4.5" height="14" rx="0.8" />
+      <rect x="16" y="9.5" width="4.5" height="10.5" rx="0.8" />
+    </>
+  ),
+  history: () => (
+    <>
+      <circle cx="12" cy="13" r="8" />
+      <line x1="12" y1="13" x2="12" y2="8.5" />
+      <line x1="12" y1="13" x2="15" y2="14.5" />
+      <path d="M4.5 6 L4.5 9.5 L8 9.5" />
+    </>
+  ),
+  help: () => (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M9.5 9.5 a2.6 2.4 0 1 1 4 2 c-1 0.7 -1.5 1.3 -1.5 2.5" />
+      <circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none" />
+    </>
+  ),
+  settings: () => (
+    <>
+      <circle cx="12" cy="12" r="3.2" />
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
+        <line
+          key={deg}
+          x1="12"
+          y1="4.2"
+          x2="12"
+          y2="6.3"
+          transform={`rotate(${deg} 12 12)`}
+        />
+      ))}
+    </>
+  ),
+  search: () => (
+    <>
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <line x1="15.3" y1="15.3" x2="20.5" y2="20.5" />
+    </>
+  ),
+  notifications: () => (
+    <>
+      <path d="M6 16 V11 a6 6 0 0 1 12 0 V16 l2 2.5 H4 Z" strokeLinejoin="round" />
+      <path d="M10 20 a2 2 0 0 0 4 0" />
+    </>
+  ),
+  close: () => (
+    <>
+      <line x1="5.5" y1="5.5" x2="18.5" y2="18.5" />
+      <line x1="18.5" y1="5.5" x2="5.5" y2="18.5" />
+    </>
+  ),
+  account_circle: () => (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="9.8" r="2.8" />
+      <path d="M5.5 18.5 a7 5.4 0 0 1 13 0" />
+    </>
+  ),
+  cloud_off: () => (
+    <>
+      <path d="M7.5 17 h9 a4 4 0 0 0 0.5 -7.9 A6 6 0 0 0 5.8 12.2 A3.7 3.7 0 0 0 7.5 17 Z" />
+      <line x1="3.5" y1="3.5" x2="20.5" y2="20.5" />
+    </>
+  ),
+  info: () => (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <line x1="12" y1="11" x2="12" y2="16.5" />
+      <circle cx="12" cy="7.7" r="0.9" fill="currentColor" stroke="none" />
+    </>
+  ),
+  check_circle: () => (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <polyline points="8,12.3 10.8,15 16,9.3" strokeLinejoin="round" />
+    </>
+  ),
+  location_on: () => (
+    <>
+      <path d="M12 21 C8 16.5 5.5 13.2 5.5 10 a6.5 6.5 0 0 1 13 0 C18.5 13.2 16 16.5 12 21 Z" strokeLinejoin="round" />
+      <circle cx="12" cy="10" r="2.3" />
+    </>
+  ),
+  hub: () => (
+    <>
+      <circle cx="12" cy="12" r="2.4" />
+      <circle cx="12" cy="4" r="1.8" />
+      <circle cx="5" cy="18.5" r="1.8" />
+      <circle cx="19" cy="18.5" r="1.8" />
+      <line x1="12" y1="9.6" x2="12" y2="5.8" />
+      <line x1="10.2" y1="13.6" x2="6" y2="17" />
+      <line x1="13.8" y1="13.6" x2="18" y2="17" />
+    </>
+  ),
+  source: () => (
+    <>
+      <rect x="5" y="3.5" width="14" height="17" rx="1.2" />
+      <line x1="8" y1="8.5" x2="16" y2="8.5" />
+      <line x1="8" y1="12" x2="16" y2="12" />
+      <line x1="8" y1="15.5" x2="13" y2="15.5" />
+    </>
+  ),
+  verified: () => (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <polyline points="8,12.3 10.8,15 16,9.3" strokeLinejoin="round" />
+    </>
+  ),
+  verified_user: () => (
+    <>
+      <path d="M12 3.5 L19 6.5 V12 c0 4.5 -3 7.5 -7 8.5 c-4 -1 -7 -4 -7 -8.5 V6.5 Z" strokeLinejoin="round" />
+      <polyline points="8.5,12 10.8,14.3 15.5,9.5" strokeLinejoin="round" />
+    </>
+  ),
+  arrow_forward: () => (
+    <>
+      <line x1="4" y1="12" x2="19" y2="12" />
+      <polyline points="13,6.5 19,12 13,17.5" strokeLinejoin="round" />
+    </>
+  ),
+  fact_check: () => (
+    <>
+      <rect x="4.5" y="4" width="15" height="17" rx="1.2" />
+      <rect x="9" y="2.3" width="6" height="3" rx="0.8" fill="currentColor" stroke="none" />
+      <polyline points="7.5,11 9.2,12.8 12,9.5" strokeLinejoin="round" />
+      <line x1="14" y1="11" x2="17" y2="11" />
+      <line x1="7.5" y1="16.5" x2="17" y2="16.5" />
+    </>
+  ),
+  input: () => (
+    <>
+      <path d="M9 4 H6 a1.5 1.5 0 0 0 -1.5 1.5 v13 A1.5 1.5 0 0 0 6 20 h3" />
+      <line x1="8" y1="12" x2="19" y2="12" />
+      <polyline points="15,8 19,12 15,16" strokeLinejoin="round" />
+    </>
+  ),
+  gpp_maybe: () => (
+    <>
+      <path d="M12 3.5 L19 6.5 V12 c0 4.5 -3 7.5 -7 8.5 c-4 -1 -7 -4 -7 -8.5 V6.5 Z" strokeLinejoin="round" />
+      <path d="M10.3 9.3 a2 1.8 0 1 1 3 1.6 c-0.8 0.5 -1.2 1 -1.2 2" />
+      <circle cx="12" cy="15.3" r="0.85" fill="currentColor" stroke="none" />
+    </>
+  ),
+  auto_fix_high: () => (
+    <>
+      <line x1="5" y1="19" x2="15.5" y2="8.5" />
+      <path d="M19 3 l0.9 2.1 L22 6 l-2.1 0.9 L19 9 l-0.9 -2.1 L16 6 l2.1 -0.9 Z" strokeLinejoin="round" />
+      <path d="M7 13 l0.6 1.4 L9 15 l-1.4 0.6 L7 17 l-0.6 -1.4 L5 15 l1.4 -0.6 Z" strokeLinejoin="round" />
+    </>
+  ),
+  local_fire_department: () => (
+    <>
+      <path d="M12 21 c-3.5 0 -6 -2.3 -6 -5.6 c0 -2.3 1.3 -3.7 2.3 -5.2 c0.3 2 1.3 2.8 1.3 2.8 c-0.4 -3 1 -5.5 3 -7 c-0.4 2 0.4 3.3 1.6 4.6 c1.3 1.4 2.8 3 2.8 5 c0 3.1 -2.5 5.4 -5 5.4 Z" strokeLinejoin="round" />
+    </>
+  ),
+  priority_high: () => (
+    <>
+      <line x1="12" y1="4" x2="12" y2="14.5" />
+      <circle cx="12" cy="19" r="1" fill="currentColor" stroke="none" />
+    </>
+  ),
+  hourglass_top: () => (
+    <>
+      <line x1="6" y1="3.5" x2="18" y2="3.5" />
+      <line x1="6" y1="20.5" x2="18" y2="20.5" />
+      <path d="M7.5 3.5 v3 c0 2 1.6 3.6 4.5 5 c2.9 -1.4 4.5 -3 4.5 -5 v-3" strokeLinejoin="round" />
+      <path d="M7.5 20.5 v-3 c0 -2 1.6 -3.6 4.5 -5 c2.9 1.4 4.5 3 4.5 5 v3" strokeLinejoin="round" />
+    </>
+  ),
+  error: () => (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <line x1="12" y1="7.5" x2="12" y2="13" />
+      <circle cx="12" cy="16" r="0.9" fill="currentColor" stroke="none" />
+    </>
+  ),
+};
+
 function Icon({ name, fill = false }) {
+  const draw = ICONS[name];
   return (
-    <span className={`material-symbols-outlined ${fill ? "icon-fill" : ""}`}>
-      {name}
-    </span>
+    <svg
+      className="icon-svg"
+      viewBox="0 0 24 24"
+      width="1em"
+      height="1em"
+      fill={fill ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={fill ? 1.4 : 1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {draw ? draw() : <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />}
+    </svg>
   );
 }
 
