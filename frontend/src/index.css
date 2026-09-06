@@ -380,6 +380,124 @@ select {
   position: relative;
 }
 
+.notif-wrapper {
+  position: relative;
+}
+
+.notif-count {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 999px;
+  background: var(--red);
+  color: #1a0304;
+
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.notif-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 60;
+
+  width: 320px;
+  max-height: 360px;
+  overflow-y: auto;
+
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+.notif-panel-head {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.notif-panel ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.notif-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.notif-item:last-child {
+  border-bottom: 0;
+}
+
+.notif-item .material-symbols-outlined {
+  font-size: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.notif-item.tone-critical .material-symbols-outlined {
+  color: var(--red);
+}
+
+.notif-item.tone-warning .material-symbols-outlined {
+  color: var(--yellow);
+}
+
+.notif-item div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.notif-item span {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.notif-item em {
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+@media (max-width: 560px) {
+  .notif-panel {
+    position: fixed;
+    top: 60px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+  }
+}
+
 .search-results {
   position: absolute;
   top: calc(100% + 8px);
@@ -3499,3 +3617,69 @@ select:focus-visible {
     scroll-behavior: auto !important;
   }
 }
+
+/* Manual override from Settings — independent of the OS-level media query
+   above, for people who want less motion without changing a system setting. */
+html.force-reduced-motion *,
+html.force-reduced-motion *::before,
+html.force-reduced-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* =========================================================
+   INTERFACE DENSITY (Settings preference)
+   ========================================================= */
+
+html.density-compact .content {
+  padding: 20px 24px 40px;
+}
+
+html.density-compact .setting-row,
+html.density-compact .plain-list li,
+html.density-compact .notif-item {
+  padding: 7px 10px;
+}
+
+html.density-compact .card,
+html.density-compact [class$="-card"],
+html.density-compact [class$="-panel"] {
+  padding: 14px;
+}
+
+.pref-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.pref-toggle input {
+  accent-color: var(--cyan);
+  width: 15px;
+  height: 15px;
+}
+
+.pref-toggle span {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+}
+
+.pref-select {
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.pref-select:disabled {
+  opacity: 0.5;
+}
+
