@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,300..700,0..1,0,0&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -117,31 +117,16 @@ select {
 }
 
 /* =========================================================
-   MATERIAL ICONS
+   ICONS — inline SVG, no external font dependency
    ========================================================= */
 
-.material-symbols-outlined {
-  font-family: "Material Symbols Outlined";
-  font-weight: normal;
-  font-style: normal;
-  font-size: 22px;
-  line-height: 1;
-  letter-spacing: normal;
-  text-transform: none;
+.icon-svg {
   display: inline-block;
-  white-space: nowrap;
-  word-wrap: normal;
-  direction: ltr;
-
-  -webkit-font-feature-settings: "liga";
-  -webkit-font-smoothing: antialiased;
-  font-feature-settings: "liga";
-
-  font-variation-settings:
-    "FILL" 0,
-    "wght" 450,
-    "GRAD" 0,
-    "opsz" 24;
+  flex-shrink: 0;
+  width: 1em;
+  height: 1em;
+  font-size: 22px;
+  vertical-align: middle;
 }
 
 .icon-fill {
@@ -282,7 +267,8 @@ select {
   border-radius: 999px;
 }
 
-.nav-item .material-symbols-outlined {
+.nav-item .material-symbols-outlined,
+.nav-item .icon-svg {
   font-size: 20px;
 }
 
@@ -358,7 +344,8 @@ select {
   box-shadow: 0 0 0 3px rgba(69, 214, 232, 0.06);
 }
 
-.top-search .material-symbols-outlined {
+.top-search .material-symbols-outlined,
+.top-search .icon-svg {
   color: var(--text-muted);
   font-size: 20px;
 }
@@ -455,17 +442,20 @@ select {
   border-bottom: 0;
 }
 
-.notif-item .material-symbols-outlined {
+.notif-item .material-symbols-outlined,
+.notif-item .icon-svg {
   font-size: 18px;
   flex-shrink: 0;
   margin-top: 1px;
 }
 
-.notif-item.tone-critical .material-symbols-outlined {
+.notif-item.tone-critical .material-symbols-outlined,
+.notif-item.tone-critical .icon-svg {
   color: var(--red);
 }
 
-.notif-item.tone-warning .material-symbols-outlined {
+.notif-item.tone-warning .material-symbols-outlined,
+.notif-item.tone-warning .icon-svg {
   color: var(--yellow);
 }
 
@@ -538,7 +528,8 @@ select {
   background: var(--panel-hover);
 }
 
-.search-results .material-symbols-outlined {
+.search-results .material-symbols-outlined,
+.search-results .icon-svg {
   color: var(--cyan);
   font-size: 18px;
   flex-shrink: 0;
@@ -1072,7 +1063,8 @@ select {
   text-align: center;
 }
 
-.graph-empty .material-symbols-outlined {
+.graph-empty .material-symbols-outlined,
+.graph-empty .icon-svg {
   color: #536372;
   font-size: 36px;
 }
@@ -1508,7 +1500,8 @@ select {
   background: rgba(255, 255, 255, 0.022);
 }
 
-.evidence > .material-symbols-outlined {
+.evidence > .material-symbols-outlined,
+.evidence > .icon-svg {
   color: var(--cyan);
 
   font-size: 17px;
@@ -2047,7 +2040,8 @@ select {
   box-shadow: 0 0 0 3px rgba(69, 214, 232, 0.05);
 }
 
-.search-input .material-symbols-outlined {
+.search-input .material-symbols-outlined,
+.search-input .icon-svg {
   color: #607080;
 
   font-size: 19px;
@@ -2182,7 +2176,8 @@ select {
   gap: 4px;
 }
 
-.signal-card .material-symbols-outlined {
+.signal-card .material-symbols-outlined,
+.signal-card .icon-svg {
   font-size: 13px;
 }
 
@@ -2259,7 +2254,8 @@ select {
   background: rgba(69, 214, 232, 0.035);
 }
 
-.linked-incident .material-symbols-outlined {
+.linked-incident .material-symbols-outlined,
+.linked-incident .icon-svg {
   color: var(--cyan);
 }
 
@@ -2539,7 +2535,8 @@ select {
   border-bottom: 1px solid rgba(145, 165, 184, 0.06);
 }
 
-.event-row > .material-symbols-outlined {
+.event-row > .material-symbols-outlined,
+.event-row > .icon-svg {
   color: var(--cyan);
 
   font-size: 18px;
@@ -2702,7 +2699,8 @@ select {
   color: var(--cyan);
 }
 
-.stream-icon .material-symbols-outlined {
+.stream-icon .material-symbols-outlined,
+.stream-icon .icon-svg {
   font-size: 17px;
 }
 
@@ -3052,7 +3050,8 @@ select {
   text-align: center;
 }
 
-.empty-state > .material-symbols-outlined {
+.empty-state > .material-symbols-outlined,
+.empty-state > .icon-svg {
   color: #4f5e6c;
 
   font-size: 30px;
@@ -3363,7 +3362,8 @@ select {
     color: var(--cyan);
   }
 
-  .mobile-nav .material-symbols-outlined {
+  .mobile-nav .material-symbols-outlined,
+  .mobile-nav .icon-svg {
     font-size: 20px;
   }
 
@@ -3400,7 +3400,8 @@ select {
   line-height: 1.45;
 }
 
-.plain-list .material-symbols-outlined {
+.plain-list .material-symbols-outlined,
+.plain-list .icon-svg {
   color: var(--green);
   font-size: 16px;
 }
@@ -3495,7 +3496,8 @@ select {
   line-height: 1.5;
 }
 
-.modal-note .material-symbols-outlined {
+.modal-note .material-symbols-outlined,
+.modal-note .icon-svg {
   color: var(--cyan);
   font-size: 17px;
   flex-shrink: 0;
@@ -3516,7 +3518,8 @@ select {
   background: var(--panel-raised);
 }
 
-.support-list .material-symbols-outlined {
+.support-list .material-symbols-outlined,
+.support-list .icon-svg {
   color: var(--cyan);
   font-size: 20px;
   flex-shrink: 0;
