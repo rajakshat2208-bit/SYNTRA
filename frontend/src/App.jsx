@@ -72,6 +72,87 @@ function severityTone(severity) {
   return SEVERITY[severity]?.cls || "neutral";
 }
 
+/** Derives operational notifications from already-loaded backend data only —
+ * no separate endpoint, no fabricated events. Covers exactly what Phase 5
+ * asked for: pending approvals, critical incidents, agent errors. */
+function computeNotifications(data) {
+  const items = [];
+
+  (data.incidents || []).forEach((inc) => {
+    if (inc.status === "pending_approval") {
+      items.push({
+        id: `pending-${inc.id}`,
+        icon: "hourglass_top",
+        tone: "warning",
+        text: `${inc.id} is awaiting human approval`,
+        timestamp: inc.updated_at,
+      });
+    }
+    if (inc.severity === "critical" && inc.status !== "rejected") {
+      items.push({
+        id: `critical-${inc.id}`,
+        icon: "warning",
+        tone: "critical",
+        text: `${inc.id} assessed as CRITICAL — ${inc.title}`,
+        timestamp: inc.updated_at,
+      });
+    }
+  });
+
+  (data.events || []).forEach((e) => {
+    if (e.status === "error") {
+      items.push({
+        id: `error-${e.id}`,
+        icon: "error",
+        tone: "critical",
+        text: `${e.agent} failed: ${e.error || "unknown error"}`,
+        timestamp: e.timestamp,
+      });
+    }
+  });
+
+  return items
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+    .slice(0, 20);
+}
+
+/** UI preferences only — never a substitute for real backend settings.
+ * Persisted to localStorage; falls back silently to defaults if unavailable
+ * (e.g. private browsing) rather than breaking the app. */
+const PREFS_KEY = "syntra:preferences";
+const DEFAULT_PREFS = {
+  density: "comfortable",
+  reducedMotion: false,
+  autoRefresh: true,
+  refreshInterval: 10,
+};
+
+function loadPreferences() {
+  try {
+    const raw = window.localStorage.getItem(PREFS_KEY);
+    if (!raw) return DEFAULT_PREFS;
+    return { ...DEFAULT_PREFS, ...JSON.parse(raw) };
+  } catch {
+    return DEFAULT_PREFS;
+  }
+}
+
+function usePreferences() {
+  const [prefs, setPrefs] = useState(loadPreferences);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+    } catch {
+      /* localStorage unavailable — preferences simply won't persist */
+    }
+  }, [prefs]);
+
+  const updatePrefs = (patch) => setPrefs((p) => ({ ...p, ...patch }));
+
+  return [prefs, updatePrefs];
+}
+
 function PageHeader({ eyebrow, title, subtitle, actions }) {
   return (
     <div className="page-header">
@@ -103,10 +184,20 @@ function LoadingState({ label = "Loading" }) {
   );
 }
 
-function SystemHeader({ health, onNavigate, signals, incidents, onJumpToSignal, onJumpToIncident }) {
+function SystemHeader({ health, onNavigate, signals, incidents, notifications, onJumpToSignal, onJumpToIncident }) {
   const ok = health?.status === "ok";
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+
+  useEffect(() => {
+    if (!notifOpen) return;
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") setNotifOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [notifOpen]);
 
   const q = query.trim().toLowerCase();
   const matchedSignals = q
@@ -220,9 +311,42 @@ function SystemHeader({ health, onNavigate, signals, incidents, onJumpToSignal, 
             ? "AI · LIVE"
             : "FIXTURE · DEVELOPMENT"}
         </Badge>
-        <button className="icon-button" title="Notifications" type="button">
-          <Icon name="notifications" />
-        </button>
+        <div className="notif-wrapper">
+          <button
+            className="icon-button"
+            title="Notifications"
+            type="button"
+            onClick={() => setNotifOpen((v) => !v)}
+          >
+            <Icon name="notifications" />
+            {notifications.length > 0 && (
+              <span className="notif-count">{notifications.length}</span>
+            )}
+          </button>
+          {notifOpen && (
+            <div
+              className="notif-panel"
+              onMouseLeave={() => setNotifOpen(false)}
+            >
+              <div className="notif-panel-head">Operational Alerts</div>
+              {notifications.length === 0 ? (
+                <div className="search-empty">No new operational alerts</div>
+              ) : (
+                <ul>
+                  {notifications.map((n) => (
+                    <li key={n.id} className={`notif-item tone-${n.tone}`}>
+                      <Icon name={n.icon} />
+                      <div>
+                        <span>{n.text}</span>
+                        <em>{formatTime(n.timestamp)}</em>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
         <button className="icon-button" title="Operator" type="button">
           <Icon name="account_circle" />
         </button>
@@ -2229,7 +2353,7 @@ function SupportModal({ onClose }) {
   );
 }
 
-function SettingsModal({ health, onClose }) {
+function SettingsModal({ health, prefs, updatePrefs, onClose }) {
   return (
     <Modal
       title="System Settings"
@@ -2292,16 +2416,90 @@ function SettingsModal({ health, onClose }) {
 
         <div className="setting-row">
           <div>
-            <strong>Refresh interval</strong>
+            <strong>Auto refresh</strong>
             <span>
-              The interface checks the API periodically
-              for updates.
+              Automatically poll the API for updates.
             </span>
           </div>
-          <span className="setting-value">
-            10 seconds
-          </span>
+          <label className="pref-toggle">
+            <input
+              type="checkbox"
+              checked={prefs.autoRefresh}
+              onChange={(e) =>
+                updatePrefs({ autoRefresh: e.target.checked })
+              }
+            />
+            <span>{prefs.autoRefresh ? "ON" : "OFF"}</span>
+          </label>
         </div>
+
+        <div className="setting-row">
+          <div>
+            <strong>Refresh interval</strong>
+            <span>
+              How often the interface checks the API for
+              updates, when auto refresh is on.
+            </span>
+          </div>
+          <select
+            className="pref-select"
+            value={prefs.refreshInterval}
+            disabled={!prefs.autoRefresh}
+            onChange={(e) =>
+              updatePrefs({ refreshInterval: Number(e.target.value) })
+            }
+          >
+            <option value={5}>5 seconds</option>
+            <option value={10}>10 seconds</option>
+            <option value={30}>30 seconds</option>
+            <option value={60}>60 seconds</option>
+          </select>
+        </div>
+
+        <div className="setting-row">
+          <div>
+            <strong>Interface density</strong>
+            <span>
+              Compact reduces spacing for higher information
+              density.
+            </span>
+          </div>
+          <select
+            className="pref-select"
+            value={prefs.density}
+            onChange={(e) => updatePrefs({ density: e.target.value })}
+          >
+            <option value="comfortable">Comfortable</option>
+            <option value="compact">Compact</option>
+          </select>
+        </div>
+
+        <div className="setting-row">
+          <div>
+            <strong>Reduced motion</strong>
+            <span>
+              Minimizes animation, independent of your
+              operating system setting.
+            </span>
+          </div>
+          <label className="pref-toggle">
+            <input
+              type="checkbox"
+              checked={prefs.reducedMotion}
+              onChange={(e) =>
+                updatePrefs({ reducedMotion: e.target.checked })
+              }
+            />
+            <span>{prefs.reducedMotion ? "ON" : "OFF"}</span>
+          </label>
+        </div>
+      </div>
+      <div className="modal-note">
+        <Icon name="info" />
+        <span>
+          These preferences are saved in this browser only and do not
+          change backend behavior.
+        </span>
       </div>
     </Modal>
   );
@@ -2325,6 +2523,7 @@ function App() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [allFailed, setAllFailed] = useState(false);
+  const [prefs, updatePrefs] = usePreferences();
   const [modal, setModal] = useState(null);
   const [focusSignalId, setFocusSignalId] = useState(null);
   const [focusIncidentId, setFocusIncidentId] = useState(null);
@@ -2343,6 +2542,8 @@ function App() {
     setFocusIncidentId(id);
     navigate("incidents");
   };
+
+  const notifications = useMemo(() => computeNotifications(data), [data]);
 
   const refresh = useCallback(async () => {
     const endpoints = [
@@ -2381,8 +2582,14 @@ function App() {
   useEffect(() => {
     refresh();
 
-    const timer = setInterval(refresh, 10000);
+    if (!prefs.autoRefresh) return undefined;
 
+    const timer = setInterval(refresh, prefs.refreshInterval * 1000);
+
+    return () => clearInterval(timer);
+  }, [refresh, prefs.autoRefresh, prefs.refreshInterval]);
+
+  useEffect(() => {
     const hash = () =>
       setActive(
         window.location.hash.replace("#", "") ||
@@ -2392,13 +2599,20 @@ function App() {
     window.addEventListener("hashchange", hash);
 
     return () => {
-      clearInterval(timer);
-      window.removeEventListener(
-        "hashchange",
-        hash
-      );
+      window.removeEventListener("hashchange", hash);
     };
-  }, [refresh]);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle(
+      "density-compact",
+      prefs.density === "compact"
+    );
+    document.documentElement.classList.toggle(
+      "force-reduced-motion",
+      prefs.reducedMotion
+    );
+  }, [prefs.density, prefs.reducedMotion]);
 
   const page =
     active === "incidents" ? (
@@ -2431,6 +2645,7 @@ function App() {
           onNavigate={navigate}
           signals={data.signals}
           incidents={data.incidents}
+          notifications={notifications}
           onJumpToSignal={jumpToSignal}
           onJumpToIncident={jumpToIncident}
         />
@@ -2475,6 +2690,8 @@ function App() {
       {modal === "settings" && (
         <SettingsModal
           health={data.health}
+          prefs={prefs}
+          updatePrefs={updatePrefs}
           onClose={() => setModal(null)}
         />
       )}
