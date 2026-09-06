@@ -2324,6 +2324,7 @@ function App() {
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [allFailed, setAllFailed] = useState(false);
   const [modal, setModal] = useState(null);
   const [focusSignalId, setFocusSignalId] = useState(null);
   const [focusIncidentId, setFocusIncidentId] = useState(null);
@@ -2344,35 +2345,37 @@ function App() {
   };
 
   const refresh = useCallback(async () => {
-    try {
-      const [
-        health,
-        signals,
-        incidents,
-        agents,
-        events,
-      ] = await Promise.all([
-        getHealth(),
-        listSignals(),
-        listIncidents(),
-        listAgents(),
-        listAgentEvents(),
-      ]);
+    const endpoints = [
+      ["health", getHealth],
+      ["signals", listSignals],
+      ["incidents", listIncidents],
+      ["agents", listAgents],
+      ["events", listAgentEvents],
+    ];
 
-      setData({
-        health,
-        signals,
-        incidents,
-        agents,
-        events,
+    const results = await Promise.allSettled(
+      endpoints.map(([, fn]) => fn())
+    );
+
+    const failures = [];
+    setData((prev) => {
+      const next = { ...prev };
+      results.forEach((result, i) => {
+        const [key] = endpoints[i];
+        if (result.status === "fulfilled") {
+          next[key] = result.value;
+        } else {
+          failures.push(
+            `${key.toUpperCase()} — ${result.reason?.message || "request failed"}`
+          );
+        }
       });
+      return next;
+    });
 
-      setError("");
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+    setError(failures.length ? failures.join("  ·  ") : "");
+    setAllFailed(failures.length === endpoints.length);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -2437,7 +2440,7 @@ function App() {
             <div className="global-error">
               <Icon name="cloud_off" />
               <span>
-                Backend unavailable: {error}
+                {allFailed ? "Backend unavailable" : "Some data unavailable"}: {error}
               </span>
               <button
                 onClick={refresh}
