@@ -661,48 +661,164 @@ function Metric({ label, value, tone = "neutral", hint }) {
   );
 }
 
-function AgentFlow({ events }) {
-  const latest = {};
+const AGENT_ORDER = ["Intake", "Correlation", "Risk", "Response", "Supervisor"];
 
-  events.forEach((e) => {
-    if (!latest[e.agent]) latest[e.agent] = e;
+const AGENT_FALLBACK_ROLE = {
+  Intake: "Normalizes newly submitted signals",
+  Correlation: "Links related signals into candidate incidents",
+  Risk: "Assesses severity, confidence, and evidence",
+  Response: "Generates a recommended, human-approved response plan",
+  Supervisor: "Coordinates the workflow and enforces human approval",
+};
+
+function AgentFlow({ events, agents, incidents }) {
+  const [selected, setSelected] = useState(null);
+
+  const latest = useMemo(() => {
+    const m = {};
+    events.forEach((e) => {
+      if (!m[e.agent]) m[e.agent] = e;
+    });
+    return m;
+  }, [events]);
+
+  const pendingApproval = (incidents || []).some(
+    (i) => i.status === "pending_approval"
+  );
+  const hasActivity = events.length > 0;
+
+  const stages = AGENT_ORDER.map((name, i) => {
+    const event = latest[name];
+    let state = "idle";
+    if (name === "Supervisor" && pendingApproval) {
+      state = "human-review";
+    } else if (event?.status === "error") {
+      state = "error";
+    } else if (event?.status === "completed") {
+      state = "complete";
+    }
+    return {
+      name,
+      number: i + 1,
+      icon: AGENT_ICONS[name],
+      event,
+      state,
+      role:
+        agents?.find((a) => a.name === name)?.role ||
+        AGENT_FALLBACK_ROLE[name],
+    };
   });
 
-  return (
-    <div className="agent-flow">
-      {Object.keys(AGENT_ICONS).map((agent, index) => {
-        const event = latest[agent];
-        const status = event?.status || "idle";
+  const selectedStage = stages.find((s) => s.name === selected);
 
-        return (
-          <div
-            className={`flow-stage ${
-              status === "completed"
-                ? "complete"
-                : status === "error"
-                ? "error"
-                : event
-                ? "active"
-                : ""
-            }`}
-            key={agent}
-          >
-            <div className="flow-node">
-              <Icon
-                name={AGENT_ICONS[agent]}
-                fill={status === "completed"}
-              />
-              {event && <span className="node-dot" />}
-            </div>
-            <span>{agent.toUpperCase()}</span>
-            {index < 4 && (
-              <div className="flow-line">
-                <i />
+  const STATE_LABEL = {
+    idle: "IDLE",
+    complete: "COMPLETE",
+    error: "ERROR",
+    "human-review": "HUMAN REVIEW",
+  };
+
+  return (
+    <div className="agent-flow-wrap">
+      <div className={`agent-flow ${hasActivity ? "has-activity" : "idle-only"}`}>
+        {stages.map((stage, i) => (
+          <div className="flow-stage-group" key={stage.name}>
+            <button
+              type="button"
+              className={`flow-stage state-${stage.state} ${
+                selected === stage.name ? "selected" : ""
+              }`}
+              onClick={() =>
+                setSelected(selected === stage.name ? null : stage.name)
+              }
+              aria-pressed={selected === stage.name}
+              aria-label={`${stage.name} agent — ${STATE_LABEL[stage.state]}`}
+            >
+              <span className="flow-number">
+                {String(stage.number).padStart(2, "0")}
+              </span>
+              <div className="flow-node">
+                <Icon name={stage.icon} fill={stage.state === "complete"} />
+                {stage.event && <span className="node-dot" />}
+              </div>
+              <span className="flow-name">{stage.name.toUpperCase()}</span>
+              <span className="flow-status-label">
+                {STATE_LABEL[stage.state]}
+              </span>
+            </button>
+            {i < stages.length - 1 && (
+              <div
+                className={`flow-line ${
+                  stage.event || stages[i + 1].event ? "active" : ""
+                }`}
+              >
+                <i style={{ animationDelay: `${i * 0.3}s` }} />
               </div>
             )}
           </div>
-        );
-      })}
+        ))}
+      </div>
+
+      <div className="agent-detail">
+        {selectedStage ? (
+          <>
+            <div className="agent-detail-head">
+              <span className="eyebrow">AGENT ACTIVITY</span>
+              <h4>{selectedStage.name} Agent</h4>
+            </div>
+            <p className="agent-role-text">{selectedStage.role}</p>
+
+            {selectedStage.state === "human-review" && (
+              <div className="human-review-banner">
+                <span>AI RECOMMENDATION</span>
+                <Icon name="arrow_forward" />
+                <span>HUMAN REVIEW — APPROVAL REQUIRED</span>
+              </div>
+            )}
+
+            {selectedStage.event ? (
+              <dl className="agent-detail-grid">
+                <div>
+                  <dt>STATUS</dt>
+                  <dd>{selectedStage.event.status}</dd>
+                </div>
+                <div>
+                  <dt>MODE</dt>
+                  <dd>{selectedStage.event.mode || "—"}</dd>
+                </div>
+                {selectedStage.event.incident_id && (
+                  <div>
+                    <dt>INCIDENT</dt>
+                    <dd>{selectedStage.event.incident_id}</dd>
+                  </div>
+                )}
+                <div>
+                  <dt>TIMESTAMP</dt>
+                  <dd>{formatTime(selectedStage.event.timestamp)}</dd>
+                </div>
+                {selectedStage.event.output_summary && (
+                  <div className="span-2">
+                    <dt>ACTION</dt>
+                    <dd>{selectedStage.event.output_summary}</dd>
+                  </div>
+                )}
+                {selectedStage.event.error && (
+                  <div className="span-2">
+                    <dt>ERROR</dt>
+                    <dd className="text-error">{selectedStage.event.error}</dd>
+                  </div>
+                )}
+              </dl>
+            ) : (
+              <p className="agent-no-event">No agent execution selected.</p>
+            )}
+          </>
+        ) : (
+          <p className="agent-no-event">
+            Select an agent above to view its latest activity.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -1359,6 +1475,8 @@ function CommandCenter({ data, refresh }) {
           events={
             events.length ? events : data.events
           }
+          agents={agents}
+          incidents={incidents}
         />
       </div>
     </div>
@@ -2125,7 +2243,7 @@ function AgentsPage({ data }) {
       />
 
       <div className="agent-visual">
-        <AgentFlow events={events} />
+        <AgentFlow events={events} agents={data.agents} incidents={data.incidents} />
       </div>
 
       <div className="agent-cards">
