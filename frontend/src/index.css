@@ -28,6 +28,8 @@
 
   --bg: #05080c;
   --bg-soft: #080d13;
+  --sidebar-width: 250px;
+  --header-height: 68px;
   --panel: #0b1118;
   --panel-raised: #0e151e;
   --panel-hover: #111a24;
@@ -142,14 +144,17 @@ select {
    ========================================================= */
 
 .app-shell {
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   min-height: 100vh;
   background: var(--bg);
 }
 
 .workspace {
-  flex: 1;
+  grid-column: 2;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* =========================================================
@@ -157,9 +162,12 @@ select {
    ========================================================= */
 
 .sidebar {
-  position: fixed;
-  inset: 0 auto 0 0;
-  width: 250px;
+  grid-column: 1;
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  width: var(--sidebar-width);
   display: flex;
   flex-direction: column;
 
@@ -173,6 +181,8 @@ select {
     );
 
   border-right: 1px solid var(--border);
+
+  overflow-y: auto;
 
   z-index: 50;
 }
@@ -643,9 +653,9 @@ select {
    ========================================================= */
 
 .content {
-  margin-left: 250px;
+  min-width: 0;
 
-  min-height: calc(100vh - 68px);
+  min-height: calc(100vh - var(--header-height));
 
   padding: 34px 38px 60px;
 }
@@ -674,10 +684,11 @@ select {
 
 .page-header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-start;
 
-  gap: 24px;
+  gap: 16px 24px;
 
   margin-bottom: 28px;
 }
@@ -730,6 +741,8 @@ select {
 
 .system-card {
   min-width: 165px;
+  max-width: 100%;
+  box-sizing: border-box;
 
   padding: 12px 14px;
 
@@ -1740,6 +1753,8 @@ select {
   margin-top: 14px;
 
   padding: 20px;
+
+  overflow-x: auto;
 }
 
 .agent-flow {
@@ -1747,6 +1762,7 @@ select {
   align-items: flex-start;
 
   width: 100%;
+  min-width: 460px;
 
   padding: 15px 4px 4px;
 }
@@ -1755,6 +1771,7 @@ select {
   position: relative;
 
   flex: 1;
+  min-width: 0;
 
   display: flex;
   align-items: center;
@@ -1956,6 +1973,7 @@ select {
 .form-error,
 .global-error {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 
@@ -1971,6 +1989,11 @@ select {
   color: var(--red);
 
   font-size: 10px;
+}
+
+.global-error span {
+  min-width: 0;
+  flex: 1 1 200px;
 }
 
 .global-error {
@@ -3147,12 +3170,7 @@ select {
    ========================================================= */
 
 @media (max-width: 1200px) {
-  .sidebar {
-    width: 220px;
-  }
-
   .content {
-    margin-left: 220px;
     padding: 28px 24px 50px;
   }
 
@@ -3203,13 +3221,15 @@ select {
 }
 
 @media (max-width: 720px) {
+  .app-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .sidebar {
     display: none;
   }
 
   .content {
-    margin-left: 0;
-
     padding: 22px 15px 90px;
   }
 
