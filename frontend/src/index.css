@@ -1047,6 +1047,284 @@ select {
     #070c12;
 }
 
+.fusion-svg {
+  position: absolute;
+  inset: 0;
+
+  width: 100%;
+  height: 100%;
+}
+
+/* =========================================================
+   AMBIENT (EMPTY STATE) VISUALIZATION
+   ========================================================= */
+
+.ambient-edges line {
+  stroke: rgba(69, 214, 232, 0.14);
+  stroke-width: 0.6;
+  stroke-dasharray: 2 5;
+
+  animation: fusionDash 6s linear infinite;
+}
+
+.ambient-nodes circle {
+  fill: rgba(69, 214, 232, 0.35);
+
+  animation: ambientPulse 4.5s ease-in-out infinite;
+}
+
+.center-pulse .pulse-ring {
+  fill: none;
+  stroke: rgba(69, 214, 232, 0.25);
+  stroke-width: 1;
+
+  animation: centerRing 3.6s ease-out infinite;
+}
+
+.center-pulse .ring-b {
+  animation-delay: 1.8s;
+}
+
+.center-pulse .pulse-core {
+  fill: rgba(69, 214, 232, 0.55);
+}
+
+.fusion-sweep {
+  opacity: 0.5;
+  animation: fusionSweep 7s ease-in-out infinite;
+}
+
+@keyframes fusionDash {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+
+@keyframes ambientPulse {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.75;
+  }
+}
+
+@keyframes centerRing {
+  0% {
+    r: 6;
+    opacity: 0.5;
+  }
+  100% {
+    r: 34;
+    opacity: 0;
+  }
+}
+
+@keyframes fusionSweep {
+  0% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(460px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+/* =========================================================
+   REAL-DATA VISUALIZATION
+   ========================================================= */
+
+.fusion-active {
+  position: absolute;
+  inset: 0;
+}
+
+.fusion-edges line {
+  stroke: rgba(69, 214, 232, 0.3);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+
+  animation: fusionDash 2.6s linear infinite;
+
+  transition: opacity 160ms ease;
+}
+
+.fusion-edges line.dim {
+  opacity: 0.25;
+}
+
+.signal-node-svg {
+  cursor: pointer;
+
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.signal-node-svg:focus {
+  outline: none;
+}
+
+.signal-node-svg.dim {
+  opacity: 0.35;
+}
+
+.signal-node-svg .node-outer {
+  fill: rgba(69, 214, 232, 0.08);
+  stroke: var(--cyan);
+  stroke-width: 1.2;
+  stroke-opacity: 0.55;
+}
+
+.signal-node-svg .node-core {
+  fill: var(--cyan);
+}
+
+.signal-node-svg.sev-critical .node-outer,
+.signal-node-svg.sev-critical .node-core {
+  stroke: var(--red);
+  fill: var(--red);
+}
+
+.signal-node-svg.sev-critical .node-outer {
+  fill: rgba(255, 93, 108, 0.08);
+}
+
+.signal-node-svg.sev-high .node-outer,
+.signal-node-svg.sev-high .node-core {
+  stroke: var(--orange);
+  fill: var(--orange);
+}
+
+.signal-node-svg.sev-high .node-outer {
+  fill: rgba(251, 146, 60, 0.08);
+}
+
+.signal-node-svg.sev-medium .node-outer,
+.signal-node-svg.sev-medium .node-core {
+  stroke: var(--yellow);
+  fill: var(--yellow);
+}
+
+.signal-node-svg.sev-medium .node-outer {
+  fill: rgba(250, 204, 21, 0.08);
+}
+
+.signal-node-svg.hovered .node-outer,
+.signal-node-svg:focus .node-outer {
+  stroke-width: 2;
+  stroke-opacity: 1;
+}
+
+.incident-node-svg .incident-ring-outer {
+  fill: rgba(255, 93, 108, 0.08);
+  stroke: var(--red);
+  stroke-width: 1.4;
+
+  animation: incidentPulseSvg 2.4s ease-in-out infinite;
+}
+
+.incident-node-svg .incident-core {
+  fill: var(--red);
+}
+
+.incident-node-svg.sev-high .incident-ring-outer,
+.incident-node-svg.sev-high .incident-core {
+  stroke: var(--orange);
+  fill: var(--orange);
+}
+
+.incident-node-svg.sev-high .incident-ring-outer {
+  fill: rgba(251, 146, 60, 0.08);
+}
+
+.incident-node-svg.sev-medium .incident-ring-outer,
+.incident-node-svg.sev-medium .incident-core {
+  stroke: var(--yellow);
+  fill: var(--yellow);
+}
+
+.incident-node-svg.sev-medium .incident-ring-outer {
+  fill: rgba(250, 204, 21, 0.08);
+}
+
+@keyframes incidentPulseSvg {
+  0%,
+  100% {
+    stroke-opacity: 0.7;
+  }
+  50% {
+    stroke-opacity: 1;
+  }
+}
+
+.fusion-incident-label {
+  position: absolute;
+  left: 50%;
+  top: 62%;
+  transform: translate(-50%, 0);
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+
+  pointer-events: none;
+
+  text-align: center;
+}
+
+.fusion-incident-label strong {
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.fusion-incident-label small {
+  max-width: 180px;
+  color: var(--text-muted);
+  font-size: 9px;
+}
+
+.fusion-tooltip {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 14px));
+
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  min-width: 150px;
+  padding: 9px 11px;
+
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+
+  background: var(--panel);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+
+  pointer-events: none;
+
+  z-index: 5;
+}
+
+.fusion-tooltip strong {
+  margin-bottom: 2px;
+
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+}
+
+.fusion-tooltip span {
+  color: var(--text-soft);
+  font-size: 10px;
+}
+
 .graph-grid {
   position: absolute;
   inset: 0;
@@ -1127,141 +1405,23 @@ select {
   background: var(--red);
 }
 
-/* Signal graph nodes */
-
-.signal-node,
-.incident-node {
-  position: absolute;
-
-  z-index: 3;
-
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-
-  gap: 5px;
-}
-
-.signal-node > div {
-  width: 42px;
-  height: 42px;
-
-  display: grid;
-  place-items: center;
-
-  border: 1px solid rgba(69, 214, 232, 0.3);
-  border-radius: 50%;
-
-  background: rgba(69, 214, 232, 0.08);
-
-  color: var(--cyan);
-
-  box-shadow: 0 0 24px rgba(69, 214, 232, 0.08);
-}
-
-.signal-node span,
-.incident-node span {
-  color: var(--text-soft);
-
-  font-family: var(--mono);
-
-  font-size: 8px;
-}
-
-.signal-node.n0 {
-  left: 12%;
-  top: 17%;
-}
-
-.signal-node.n1 {
-  left: 19%;
-  bottom: 18%;
-}
-
-.signal-node.n2 {
-  right: 17%;
-  top: 16%;
-}
-
-.signal-node.n3 {
-  right: 11%;
-  bottom: 20%;
-}
-
-.signal-node.n4 {
-  left: 43%;
-  top: 7%;
-}
-
-.incident-node {
-  left: 50%;
-  top: 50%;
-
-  transform: translate(-50%, -50%);
-}
-
-.incident-ring {
-  width: 76px;
-  height: 76px;
-
-  display: grid;
-  place-items: center;
-
-  border: 1px solid rgba(255, 93, 108, 0.5);
-  border-radius: 50%;
-
-  color: var(--red);
-
-  background: rgba(255, 93, 108, 0.08);
-
-  box-shadow:
-    0 0 0 8px rgba(255, 93, 108, 0.035),
-    0 0 40px rgba(255, 93, 108, 0.12);
-
-  animation: incidentPulse 2.4s ease-in-out infinite;
-}
-
-@keyframes incidentPulse {
-  50% {
-    box-shadow:
-      0 0 0 13px rgba(255, 93, 108, 0.02),
-      0 0 55px rgba(255, 93, 108, 0.18);
+@media (prefers-reduced-motion: reduce) {
+  .ambient-edges line,
+  .ambient-nodes circle,
+  .center-pulse .pulse-ring,
+  .fusion-sweep,
+  .fusion-edges line,
+  .incident-node-svg .incident-ring-outer {
+    animation: none !important;
   }
-}
 
-.incident-node small {
-  max-width: 180px;
+  .ambient-nodes circle {
+    opacity: 0.5;
+  }
 
-  color: var(--text-muted);
-
-  font-size: 9px;
-
-  text-align: center;
-}
-
-.link {
-  position: absolute;
-  inset: 0;
-
-  width: 100%;
-  height: 100%;
-
-  z-index: 1;
-
-  pointer-events: none;
-}
-
-.link line {
-  stroke: rgba(69, 214, 232, 0.18);
-  stroke-width: 0.8;
-  stroke-dasharray: 3 4;
-
-  animation: dashMove 3s linear infinite;
-}
-
-@keyframes dashMove {
-  to {
-    stroke-dashoffset: -30;
+  .center-pulse .pulse-ring {
+    r: 14;
+    opacity: 0.3;
   }
 }
 

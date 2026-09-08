@@ -707,6 +707,174 @@ function AgentFlow({ events }) {
   );
 }
 
+/** Deterministic ambient geometry for the empty state — explicitly
+ * non-semantic (no labels, no severity, no IDs). These do not represent
+ * real signals; they exist only to communicate "a live intelligence
+ * system, currently idle" per design brief. Fixed coordinates (not
+ * random) so the render is stable across re-renders and testable. */
+const AMBIENT_NODES = [
+  { x: 70, y: 55 },
+  { x: 158, y: 32 },
+  { x: 250, y: 46 },
+  { x: 320, y: 92 },
+  { x: 262, y: 156 },
+  { x: 142, y: 166 },
+  { x: 68, y: 128 },
+];
+const AMBIENT_EDGES = [
+  [0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 0], [1, 6],
+];
+
+function SignalFusionAmbient() {
+  return (
+    <svg
+      className="fusion-svg fusion-ambient"
+      viewBox="0 0 390 210"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id="fusionScan" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="var(--cyan)" stopOpacity="0" />
+          <stop offset="50%" stopColor="var(--cyan)" stopOpacity="0.3" />
+          <stop offset="100%" stopColor="var(--cyan)" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+
+      <g className="ambient-edges">
+        {AMBIENT_EDGES.map(([a, b], i) => {
+          const p1 = AMBIENT_NODES[a];
+          const p2 = AMBIENT_NODES[b];
+          return <line key={i} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} />;
+        })}
+      </g>
+
+      <g className="ambient-nodes">
+        {AMBIENT_NODES.map((p, i) => (
+          <circle
+            key={i}
+            cx={p.x}
+            cy={p.y}
+            r="2.6"
+            style={{ animationDelay: `${i * 0.35}s` }}
+          />
+        ))}
+      </g>
+
+      <g className="center-pulse" transform="translate(195,105)">
+        <circle className="pulse-ring ring-a" r="9" />
+        <circle className="pulse-ring ring-b" r="9" />
+        <circle className="pulse-core" r="3" />
+      </g>
+
+      <rect className="fusion-sweep" x="-70" y="0" width="70" height="210" fill="url(#fusionScan)" />
+    </svg>
+  );
+}
+
+function SignalFusionActive({ shown, selectedIncident }) {
+  const [hoverId, setHoverId] = useState(null);
+  const cx = 195;
+  const cy = 105;
+  const radius = 72;
+
+  const nodes = shown.map((s, i) => {
+    const angle = (i / shown.length) * Math.PI * 2 - Math.PI / 2;
+    return {
+      ...s,
+      x: cx + radius * Math.cos(angle),
+      y: cy + radius * 0.72 * Math.sin(angle),
+    };
+  });
+
+  const hovered = nodes.find((n) => n.id === hoverId);
+
+  return (
+    <div className="fusion-active">
+      <svg
+        className="fusion-svg"
+        viewBox="0 0 390 210"
+        preserveAspectRatio="xMidYMid meet"
+      >
+        {selectedIncident && (
+          <g className="fusion-edges">
+            {nodes.map((n) => (
+              <line
+                key={`edge-${n.id}`}
+                x1={n.x}
+                y1={n.y}
+                x2={cx}
+                y2={cy}
+                className={hoverId && hoverId !== n.id ? "dim" : ""}
+              />
+            ))}
+          </g>
+        )}
+
+        {selectedIncident && (
+          <g
+            className={`incident-node-svg sev-${selectedIncident.severity || "unknown"}`}
+            transform={`translate(${cx},${cy})`}
+          >
+            <circle className="incident-ring-outer" r="20" />
+            <circle className="incident-core" r="7" />
+          </g>
+        )}
+
+        {nodes.map((n) => (
+          <g
+            key={n.id}
+            transform={`translate(${n.x},${n.y})`}
+            className={[
+              "signal-node-svg",
+              `sev-${n.severity || "unknown"}`,
+              hoverId === n.id ? "hovered" : "",
+              hoverId && hoverId !== n.id ? "dim" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            onMouseEnter={() => setHoverId(n.id)}
+            onMouseLeave={() => setHoverId(null)}
+            onFocus={() => setHoverId(n.id)}
+            onBlur={() => setHoverId(null)}
+            tabIndex={0}
+            role="button"
+            aria-label={`Signal ${n.id}${n.severity ? `, severity ${n.severity}` : ""}`}
+          >
+            <circle className="node-outer" r="11" />
+            <circle className="node-core" r="4.5" />
+          </g>
+        ))}
+      </svg>
+
+      {selectedIncident && (
+        <div className="fusion-incident-label">
+          <strong>{selectedIncident.id}</strong>
+          <small>{selectedIncident.title}</small>
+        </div>
+      )}
+
+      {hovered && (
+        <div
+          className="fusion-tooltip"
+          style={{
+            left: `${(hovered.x / 390) * 100}%`,
+            top: `${(hovered.y / 210) * 100}%`,
+          }}
+        >
+          <strong>SIGNAL {hovered.id}</strong>
+          <span>Source: {hovered.source || "Unknown"}</span>
+          {hovered.location && <span>Location: {hovered.location}</span>}
+          {hovered.severity && <span>Severity: {hovered.severity}</span>}
+          {hovered.timestamp && (
+            <span>Received: {formatTime(hovered.timestamp)}</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CorrelationGraph({ signals, selectedIncident }) {
   const linked =
     selectedIncident?.signal_ids
@@ -717,6 +885,8 @@ function CorrelationGraph({ signals, selectedIncident }) {
     ? linked.slice(0, 5)
     : signals.filter((s) => s.incident_id).slice(0, 5);
 
+  const hasData = shown.length > 0;
+
   return (
     <div className="correlation-panel">
       <div className="panel-title">
@@ -724,63 +894,22 @@ function CorrelationGraph({ signals, selectedIncident }) {
           <span className="eyebrow">LIVE CORRELATION</span>
           <h3>Signal Fusion</h3>
         </div>
-        <Badge tone="ai">REAL RELATIONSHIPS</Badge>
+        <Badge tone={hasData ? "ai" : "neutral"}>
+          {hasData ? "REAL RELATIONSHIPS" : "NO CORRELATIONS"}
+        </Badge>
       </div>
 
       <div className="graph-canvas">
-        <div className="graph-grid" />
-
-        {shown.length === 0 ? (
-          <div className="graph-empty">
-            <Icon name="hub" />
-            <span>No correlated signals yet.</span>
-            <small>Submit related signals to create an incident.</small>
-          </div>
+        {hasData ? (
+          <SignalFusionActive shown={shown} selectedIncident={selectedIncident} />
         ) : (
           <>
-            {shown.map((s, i) => (
-              <div key={s.id} className={`signal-node n${i}`}>
-                <div>
-                  <Icon
-                    name={SEVERITY[s.severity]?.icon || "sensors"}
-                  />
-                </div>
-                <span>{s.id}</span>
-              </div>
-            ))}
-
-            {selectedIncident && (
-              <div className="incident-node">
-                <div className="incident-ring">
-                  <Icon
-                    name={
-                      SEVERITY[selectedIncident.severity]?.icon ||
-                      "warning"
-                    }
-                    fill
-                  />
-                </div>
-                <span>{selectedIncident.id}</span>
-                <small>{selectedIncident.title}</small>
-              </div>
-            )}
-
-            {selectedIncident &&
-              shown.map((s, i) => (
-                <svg
-                  key={`l-${s.id}`}
-                  className={`link l${i}`}
-                  viewBox="0 0 100 100"
-                  preserveAspectRatio="none"
-                >
-                  <line
-                    x1="50"
-                    y1="50"
-                    x2={20 + i * 15}
-                    y2={15 + (i % 3) * 28}
-                  />
-                </svg>
-              ))}
+            <SignalFusionAmbient />
+            <div className="graph-empty">
+              <Icon name="hub" />
+              <span>No correlated signals yet.</span>
+              <small>Submit related signals to create an incident.</small>
+            </div>
           </>
         )}
       </div>
