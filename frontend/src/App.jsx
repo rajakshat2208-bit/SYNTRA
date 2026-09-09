@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   approveIncident,
   createSignal,
@@ -261,6 +261,9 @@ const ICONS = {
       <circle cx="12" cy="16" r="0.9" fill="currentColor" stroke="none" />
     </>
   ),
+  chevron_down: () => (
+    <polyline points="6,9 12,15 18,9" strokeLinejoin="round" />
+  ),
 };
 
 function Icon({ name, fill = false }) {
@@ -285,6 +288,120 @@ function Icon({ name, fill = false }) {
 
 function Badge({ children, tone = "neutral" }) {
   return <span className={`badge badge-${tone}`}>{children}</span>;
+}
+
+/**
+ * Accessible custom dropdown replacing native <select> for the SYNTRA dark
+ * UI (native selects render as an unstyleable browser-native white
+ * rectangle on most platforms). Supports full keyboard interaction and
+ * outside-click dismissal without any UI library.
+ */
+function Dropdown({ value, onChange, options, ariaLabel }) {
+  const [open, setOpen] = useState(false);
+  const [highlight, setHighlight] = useState(0);
+  const ref = useRef(null);
+  const listRef = useRef(null);
+
+  const selectedIndex = Math.max(
+    options.findIndex((o) => o.value === value),
+    0
+  );
+  const selected = options[selectedIndex];
+
+  useEffect(() => {
+    if (!open) return undefined;
+    function onDocPointer(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocPointer);
+    return () => document.removeEventListener("mousedown", onDocPointer);
+  }, [open]);
+
+  useEffect(() => {
+    if (open) {
+      setHighlight(selectedIndex);
+      listRef.current?.focus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const onTriggerKeyDown = (e) => {
+    if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown") {
+      e.preventDefault();
+      setOpen(true);
+    } else if (e.key === "Escape") {
+      setOpen(false);
+    }
+  };
+
+  const onListKeyDown = (e) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlight((h) => Math.min(h + 1, options.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlight((h) => Math.max(h - 1, 0));
+    } else if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onChange(options[highlight].value);
+      setOpen(false);
+    } else if (e.key === "Tab") {
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div className="dropdown" ref={ref}>
+      <button
+        type="button"
+        className={`dropdown-trigger ${open ? "open" : ""}`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={ariaLabel}
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={onTriggerKeyDown}
+      >
+        <span className="dropdown-trigger-content">
+          {selected.tone && <i className={`legend-dot ${selected.tone}`} />}
+          {selected.label}
+        </span>
+        <Icon name="chevron_down" />
+      </button>
+
+      {open && (
+        <ul
+          className="dropdown-menu"
+          role="listbox"
+          tabIndex={-1}
+          aria-label={ariaLabel}
+          onKeyDown={onListKeyDown}
+          ref={listRef}
+        >
+          {options.map((opt, i) => (
+            <li
+              key={opt.value || "auto"}
+              role="option"
+              aria-selected={opt.value === value}
+              className={`dropdown-option ${
+                i === highlight ? "highlighted" : ""
+              } ${opt.value === value ? "selected" : ""}`}
+              onMouseEnter={() => setHighlight(i)}
+              onClick={() => {
+                onChange(opt.value);
+                setOpen(false);
+              }}
+            >
+              {opt.tone && <i className={`legend-dot ${opt.tone}`} />}
+              {opt.label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 function formatTime(value) {
@@ -749,7 +866,11 @@ function AgentFlow({ events, agents, incidents }) {
             {i < stages.length - 1 && (
               <div
                 className={`flow-line ${
-                  stage.event || stages[i + 1].event ? "active" : ""
+                  stage.state === "error" || stages[i + 1].state === "error"
+                    ? "line-error"
+                    : stage.event || stages[i + 1].event
+                    ? "active"
+                    : ""
                 }`}
               >
                 <i style={{ animationDelay: `${i * 0.3}s` }} />
@@ -841,6 +962,39 @@ const AMBIENT_EDGES = [
   [0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 0], [1, 6],
 ];
 
+function GeospatialFrame() {
+  // Purely decorative technical framing — no fabricated coordinates,
+  // no invented lat/long values. Communicates "intelligence console"
+  // styling without pretending any of it is real geographic data.
+  return (
+    <>
+      <g className="geo-corners" stroke="rgba(69,214,232,0.35)" strokeWidth="1" fill="none">
+        <path d="M10,22 V10 H22" />
+        <path d="M368,10 H380 V22" />
+        <path d="M380,188 V200 H368" />
+        <path d="M22,200 H10 V188" />
+      </g>
+      <g className="geo-ticks" stroke="rgba(145,165,184,0.25)" strokeWidth="1">
+        {[60, 130, 200, 270, 340].map((x) => (
+          <line key={`vx-${x}`} x1={x} y1="0" x2={x} y2="6" />
+        ))}
+        {[40, 80, 120, 160].map((y) => (
+          <line key={`hy-${y}`} x1="0" y1={y} x2="6" y2={y} />
+        ))}
+      </g>
+    </>
+  );
+}
+
+function GeospatialBadge() {
+  return (
+    <div className="geo-badge">
+      <span className="eyebrow">GEOSPATIAL CONTEXT</span>
+      <span>Awaiting geospatial coordinates</span>
+    </div>
+  );
+}
+
 function SignalFusionAmbient() {
   return (
     <svg
@@ -855,7 +1009,13 @@ function SignalFusionAmbient() {
           <stop offset="50%" stopColor="var(--cyan)" stopOpacity="0.3" />
           <stop offset="100%" stopColor="var(--cyan)" stopOpacity="0" />
         </linearGradient>
+        <radialGradient id="radarWedge" cx="0" cy="0" r="1">
+          <stop offset="0%" stopColor="var(--cyan)" stopOpacity="0.28" />
+          <stop offset="100%" stopColor="var(--cyan)" stopOpacity="0" />
+        </radialGradient>
       </defs>
+
+      <GeospatialFrame />
 
       <g className="ambient-edges">
         {AMBIENT_EDGES.map(([a, b], i) => {
@@ -875,6 +1035,16 @@ function SignalFusionAmbient() {
             style={{ animationDelay: `${i * 0.35}s` }}
           />
         ))}
+      </g>
+
+      <g transform="translate(195,105)">
+        <g className="radar-sweep-group">
+          <path
+            className="radar-wedge"
+            d="M0,0 L120,0 A120,120 0 0,0 84.8,-84.8 Z"
+            fill="url(#radarWedge)"
+          />
+        </g>
       </g>
 
       <g className="center-pulse" transform="translate(195,105)">
@@ -912,6 +1082,8 @@ function SignalFusionActive({ shown, selectedIncident }) {
         viewBox="0 0 390 210"
         preserveAspectRatio="xMidYMid meet"
       >
+        <GeospatialFrame />
+
         {selectedIncident && (
           <g className="fusion-edges">
             {nodes.map((n) => (
@@ -944,7 +1116,7 @@ function SignalFusionActive({ shown, selectedIncident }) {
             className={[
               "signal-node-svg",
               `sev-${n.severity || "unknown"}`,
-              hoverId === n.id ? "hovered" : "",
+              hoverId === n.id ? "hovered glow" : "",
               hoverId && hoverId !== n.id ? "dim" : "",
             ]
               .filter(Boolean)
@@ -1028,6 +1200,7 @@ function CorrelationGraph({ signals, selectedIncident }) {
             </div>
           </>
         )}
+        <GeospatialBadge />
       </div>
 
       <div className="graph-footer">
@@ -1559,21 +1732,19 @@ function SignalForm({ onCreated }) {
 
         <label>
           Severity
-          <select
+          <Dropdown
+            ariaLabel="Severity"
             value={form.severity}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                severity: e.target.value,
-              })
-            }
-          >
-            <option value="">Auto / unknown</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="critical">Critical</option>
-          </select>
+            onChange={(v) => setForm({ ...form, severity: v })}
+            options={[
+              { value: "", label: "Auto / unknown" },
+              ...Object.keys(SEVERITY).map((s) => ({
+                value: s,
+                label: s.charAt(0).toUpperCase() + s.slice(1),
+                tone: SEVERITY[s].cls,
+              })),
+            ]}
+          />
         </label>
 
         <label className="wide">
