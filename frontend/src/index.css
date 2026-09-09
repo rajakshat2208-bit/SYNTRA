@@ -1047,6 +1047,112 @@ select {
     #070c12;
 }
 
+/* Two faint grid layers drifting at different speeds — a lightweight
+   faux-parallax depth cue, pure CSS, no scroll/mouse tracking needed. */
+.graph-canvas::before,
+.graph-canvas::after {
+  content: "";
+  position: absolute;
+  inset: -40px;
+
+  background-image:
+    linear-gradient(rgba(145, 165, 184, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(145, 165, 184, 0.05) 1px, transparent 1px);
+  background-size: 34px 34px;
+
+  pointer-events: none;
+}
+
+.graph-canvas::after {
+  background-size: 68px 68px;
+  opacity: 0.5;
+
+  animation: gridDriftSlow 60s linear infinite;
+}
+
+.graph-canvas::before {
+  animation: gridDriftFast 38s linear infinite;
+}
+
+@keyframes gridDriftFast {
+  from {
+    transform: translate(0, 0);
+  }
+  to {
+    transform: translate(-34px, -34px);
+  }
+}
+
+@keyframes gridDriftSlow {
+  from {
+    transform: translate(0, 0);
+  }
+  to {
+    transform: translate(68px, -68px);
+  }
+}
+
+.geo-corners,
+.geo-ticks {
+  opacity: 0.7;
+}
+
+.radar-sweep-group {
+  transform-origin: 0 0;
+  animation: radarSpin 9s linear infinite;
+}
+
+@keyframes radarSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.geo-badge {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 4;
+
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-end;
+
+  pointer-events: none;
+}
+
+.geo-badge .eyebrow {
+  margin: 0;
+  font-size: 7px;
+}
+
+.geo-badge span:last-child {
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.04em;
+}
+
+.signal-node-svg.glow .node-outer {
+  filter: drop-shadow(0 0 6px var(--cyan));
+}
+
+.signal-node-svg.sev-critical.glow .node-outer {
+  filter: drop-shadow(0 0 6px var(--red));
+}
+
+.signal-node-svg.sev-high.glow .node-outer {
+  filter: drop-shadow(0 0 6px var(--orange));
+}
+
+.signal-node-svg.sev-medium.glow .node-outer {
+  filter: drop-shadow(0 0 6px var(--yellow));
+}
+
 .fusion-svg {
   position: absolute;
   inset: 0;
@@ -1401,8 +1507,140 @@ select {
   background: var(--cyan);
 }
 
-.legend-dot.red {
+.legend-dot.red,
+.legend-dot.critical {
   background: var(--red);
+}
+
+.legend-dot.high {
+  background: var(--orange);
+}
+
+.legend-dot.medium {
+  background: var(--yellow);
+}
+
+.legend-dot.low {
+  background: var(--green);
+}
+
+/* =========================================================
+   CUSTOM DROPDOWN (replaces native <select> — no browser-native
+   white rectangle in a dark UI)
+   ========================================================= */
+
+.dropdown {
+  position: relative;
+}
+
+.dropdown-trigger {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+
+  padding: 9px 11px;
+
+  border: 1px solid var(--border);
+  border-radius: 7px;
+
+  background: var(--panel-raised);
+
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+
+  cursor: pointer;
+
+  transition: border-color 140ms ease;
+}
+
+.dropdown-trigger:hover {
+  border-color: var(--border-strong);
+}
+
+.dropdown-trigger:focus-visible,
+.dropdown-trigger.open {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 2px rgba(69, 214, 232, 0.15);
+}
+
+.dropdown-trigger-content {
+  display: flex;
+  align-items: center;
+
+  min-width: 0;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropdown-trigger .icon-svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+
+  color: var(--text-muted);
+
+  transition: transform 140ms ease;
+}
+
+.dropdown-trigger.open .icon-svg {
+  transform: rotate(180deg);
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+
+  max-height: 220px;
+  overflow-y: auto;
+
+  margin: 0;
+  padding: 5px;
+
+  list-style: none;
+
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+
+  background: var(--panel);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.42);
+}
+
+.dropdown-menu:focus {
+  outline: none;
+}
+
+.dropdown-option {
+  display: flex;
+  align-items: center;
+
+  padding: 8px 9px;
+
+  border-radius: 6px;
+
+  color: var(--text-soft);
+  font-size: 12px;
+
+  cursor: pointer;
+}
+
+.dropdown-option.highlighted {
+  background: rgba(69, 214, 232, 0.08);
+  color: var(--text);
+}
+
+.dropdown-option.selected {
+  color: var(--cyan);
+  font-weight: 600;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2098,33 +2336,61 @@ select {
   background: rgba(69, 214, 232, 0.16);
 }
 
+.flow-line.line-error {
+  background: rgba(255, 93, 108, 0.18);
+}
+
 .flow-line i {
   display: block;
 
-  width: 28%;
+  width: 22%;
 
   height: 100%;
 
   background: var(--cyan);
 
-  opacity: 0.2;
+  opacity: 0;
 
-  animation: flowShimmer 3.6s ease-in-out infinite;
+  /* Ambient network heartbeat — explicitly NOT an execution indicator.
+     Slow, fades in/out, distinctly weaker and slower than the real
+     directional flow below. */
+  animation: flowAmbient 6.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
 .flow-line.active i {
-  opacity: 0.5;
+  width: 28%;
+  opacity: 0.55;
 
-  animation: flowMove 2.4s linear infinite;
+  /* Real agent activity — faster, brighter, continuous, no fade-pause.
+     Only applied when a real event exists on either endpoint agent. */
+  animation: flowMove 2.2s linear infinite;
 }
 
-@keyframes flowShimmer {
-  0%,
-  100% {
-    opacity: 0.12;
+.flow-line.line-error i {
+  background: var(--red);
+  opacity: 0.5;
+
+  animation: flowMove 2.6s linear infinite;
+}
+
+@keyframes flowAmbient {
+  0% {
+    transform: translateX(-130%);
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.28;
   }
   50% {
-    opacity: 0.3;
+    transform: translateX(460%);
+    opacity: 0.28;
+  }
+  68% {
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(460%);
+    opacity: 0;
   }
 }
 
