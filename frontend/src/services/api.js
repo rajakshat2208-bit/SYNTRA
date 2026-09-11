@@ -55,6 +55,8 @@ export const approveIncident = (id, approvedBy) =>
   req(`/incidents/${id}/approve`, { method: "POST", body: JSON.stringify({ approved_by: approvedBy }) });
 export const rejectIncident = (id, approvedBy) =>
   req(`/incidents/${id}/reject`, { method: "POST", body: JSON.stringify({ approved_by: approvedBy }) });
+export const runElectricalFireDemo = () =>
+  req("/demo/electrical-fire", { method: "POST" });
 export const listAgents = () => req("/agents");
 export const listAgentEvents = (incidentId) =>
   req(incidentId ? `/agent-events?incident_id=${incidentId}` : "/agent-events");
