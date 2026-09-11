@@ -4,6 +4,7 @@ from backend.services import repository as repo
 from backend.services.orchestrator import process_new_signal
 from backend.agents.supervisor_agent import get_agent_status
 from backend.agents.model_provider import is_ai_enabled
+from backend.demo.scenarios import run_electrical_fire_demo
 
 router = APIRouter(prefix="/api")
 
@@ -105,6 +106,11 @@ def reject_incident(incident_id: str, payload: ApprovalRequest):
         incident_id=incident_id, output_summary=f"Rejected by {payload.approved_by}",
     )
     return repo.get_incident(incident_id)
+
+
+@router.post("/demo/electrical-fire")
+def demo_electrical_fire():
+    return run_electrical_fire_demo()
 
 
 @router.get("/agents")
