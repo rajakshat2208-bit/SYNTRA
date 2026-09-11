@@ -10,6 +10,7 @@ import {
   listIncidents,
   listSignals,
   rejectIncident,
+  runElectricalFireDemo,
 } from "./services/api";
 
 const NAV = [
@@ -1238,6 +1239,7 @@ function AssessmentPanel({
   const linked = signals.filter((s) =>
     incident.signal_ids?.includes(s.id)
   );
+  const isDemo = linked.some((s) => s.metadata?.demo_scenario);
 
   return (
     <div className="assessment-panel">
@@ -1250,6 +1252,11 @@ function AssessmentPanel({
             {incident.location || "Location unavailable"}{" "}
             <span>·</span> {incident.id}
           </p>
+          {isDemo && (
+            <Badge tone="ai">
+              DEMO SCENARIO • SYNTHETIC INPUT
+            </Badge>
+          )}
         </div>
         <Badge tone={tone}>
           {(incident.severity || "unclassified").toUpperCase()}
@@ -1437,6 +1444,40 @@ function AssessmentPanel({
   );
 }
 
+function DemoScenarioButton({ onResult }) {
+  const [status, setStatus] = useState("idle"); // idle | running | done
+  const [error, setError] = useState("");
+
+  const run = async () => {
+    setStatus("running");
+    setError("");
+
+    try {
+      const result = await runElectricalFireDemo();
+      await onResult(result);
+      setStatus("done");
+    } catch (err) {
+      setError(err.message);
+      setStatus("idle");
+    }
+  };
+
+  return (
+    <div className="demo-scenario-control">
+      <button
+        className="button demo"
+        type="button"
+        onClick={run}
+        disabled={status === "running"}
+      >
+        <Icon name={status === "running" ? "hourglass_top" : "local_fire_department"} />
+        {status === "running" ? "RUNNING SCENARIO…" : "RUN DEMO SCENARIO"}
+      </button>
+      {error && <small className="demo-scenario-error">{error}</small>}
+    </div>
+  );
+}
+
 function CommandCenter({ data, refresh }) {
   const { health, signals, incidents, agents, events } = data;
   const [selectedId, setSelectedId] = useState(
@@ -1445,6 +1486,13 @@ function CommandCenter({ data, refresh }) {
   const [selected, setSelected] = useState(null);
   const [selectedEvents, setSelectedEvents] = useState([]);
   const [busy, setBusy] = useState(false);
+
+  const handleDemoResult = async (result) => {
+    await refresh();
+    if (result?.incident_id) {
+      setSelectedId(result.incident_id);
+    }
+  };
 
   useEffect(() => {
     if (!selectedId && incidents[0]) {
@@ -1519,21 +1567,24 @@ function CommandCenter({ data, refresh }) {
         title="Operations Command Center"
         subtitle="Understand what is happening. Coordinate what happens next."
         actions={
-          <div className="system-card">
-            <span>System Status</span>
-            <strong>
-              <i
-                className={`status-dot ${
-                  health?.status === "ok"
-                    ? "online"
-                    : "offline"
-                }`}
-              />
-              {health?.status === "ok"
-                ? "OPERATIONAL"
-                : "DEGRADED"}
-            </strong>
-          </div>
+          <>
+            <DemoScenarioButton onResult={handleDemoResult} />
+            <div className="system-card">
+              <span>System Status</span>
+              <strong>
+                <i
+                  className={`status-dot ${
+                    health?.status === "ok"
+                      ? "online"
+                      : "offline"
+                  }`}
+                />
+                {health?.status === "ok"
+                  ? "OPERATIONAL"
+                  : "DEGRADED"}
+              </strong>
+            </div>
+          </>
         }
       />
 
@@ -2138,6 +2189,7 @@ function IncidentsPage({ data, refresh, focusId }) {
 
         <IncidentDetail
           incident={selected}
+          signals={data.signals}
           events={events}
           timeline={timeline}
           busy={busy}
@@ -2151,6 +2203,7 @@ function IncidentsPage({ data, refresh, focusId }) {
 
 function IncidentDetail({
   incident,
+  signals,
   events,
   timeline,
   busy,
@@ -2170,6 +2223,12 @@ function IncidentDetail({
     );
   }
 
+  const isDemo = (signals || []).some(
+    (s) =>
+      incident.signal_ids?.includes(s.id) &&
+      s.metadata?.demo_scenario
+  );
+
   return (
     <div className="detail-panel incident-detail">
       <div className="detail-head">
@@ -2181,6 +2240,11 @@ function IncidentDetail({
             {incident.location ||
               "Location unavailable"}
           </p>
+          {isDemo && (
+            <Badge tone="ai">
+              DEMO SCENARIO • SYNTHETIC INPUT
+            </Badge>
+          )}
         </div>
 
         <Badge
@@ -2392,6 +2456,64 @@ function IncidentDetail({
   );
 }
 
+const SYSTEM_BOOT_LINES = [
+  { hex: "0x7a3f", text: "INIT agent_pipeline()" },
+  { hex: "0x9c2d", text: "Loading orchestration layer…" },
+  { hex: "0x4b6e", text: "Establishing service connection…" },
+  { hex: "0x1f8a", text: "Listening for agent events…" },
+  { hex: "0x3d5c", text: "System ready. Awaiting operational data…" },
+];
+
+/**
+ * Cosmetic-only terminal shown when there are zero real agent events. This
+ * is UI dressing so the panel doesn't look broken/empty — nothing here is
+ * written to the backend, SQLite, agent_events, incidents, or signals.
+ * The moment a real event exists, this component is not rendered at all;
+ * the actual event stream takes over.
+ */
+function SystemStatusTerminal() {
+  const bootTime = useMemo(() => new Date(), []);
+
+  return (
+    <div className="system-status-terminal">
+      <div className="system-status-head">
+        <span className="eyebrow">SYSTEM STATUS</span>
+        <span>NO RECORDED AGENT EVENTS</span>
+      </div>
+
+      <div className="terminal-body">
+        {SYSTEM_BOOT_LINES.map((line, i) => (
+          <div
+            className="terminal-line"
+            key={line.hex}
+            style={{ animationDelay: `${i * 0.35}s` }}
+          >
+            <span className="terminal-time">
+              [{formatTime(new Date(bootTime.getTime() + i * 900).toISOString())}]
+            </span>{" "}
+            <span className="terminal-hex">{line.hex}…</span>{" "}
+            <span className="terminal-sep">::</span> {line.text}
+          </div>
+        ))}
+        <div
+          className="terminal-cursor"
+          style={{ animationDelay: `${SYSTEM_BOOT_LINES.length * 0.35}s` }}
+        >
+          <span className="terminal-time">
+            [{formatTime(new Date(bootTime.getTime() + SYSTEM_BOOT_LINES.length * 900).toISOString())}]
+          </span>{" "}
+          <i className="cursor-blink">▍</i>
+        </div>
+      </div>
+
+      <small className="terminal-disclaimer">
+        Cosmetic system status — not an operational record. Real agent
+        events appear here automatically once signals are processed.
+      </small>
+    </div>
+  );
+}
+
 function AgentsPage({ data }) {
   const events = data.events;
 
@@ -2535,13 +2657,7 @@ function AgentsPage({ data }) {
             </div>
           ))
         ) : (
-          <EmptyState
-            icon="smart_toy"
-            title="No agent events"
-          >
-            Agent events appear when signals are
-            processed.
-          </EmptyState>
+          <SystemStatusTerminal />
         )}
       </div>
     </div>
