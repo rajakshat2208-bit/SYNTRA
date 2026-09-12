@@ -1483,7 +1483,11 @@ function AssessmentPanel({
             <span>HUMAN APPROVAL REQUIRED</span>
             <small>
               {authorityExceeded
-                ? "Approval authority exceeded (local operator policy)."
+                ? `Approval authority exceeded (local operator policy). Risk score ${
+                    incident.confidence != null
+                      ? Math.round(incident.confidence * 100)
+                      : "—"
+                  }/100 exceeds your configured maximum of ${maxApprovableRisk}/100.`
                 : "SYNTRA proposes; an operator decides."}
             </small>
           </div>
@@ -1558,7 +1562,7 @@ function DemoScenarioButton({ onResult }) {
 }
 
 function CommandCenter({ data, refresh, maxApprovableRisk }) {
-  const { health, signals, incidents, agents, events } = data;
+  const { health, signals, incidents, agents } = data;
   const [selectedId, setSelectedId] = useState(
     incidents[0]?.id || null
   );
@@ -1788,16 +1792,14 @@ function CommandCenter({ data, refresh, maxApprovableRisk }) {
             <h3>Live Agent Activity Flow</h3>
           </div>
           <span>
-            {events.length
-              ? `${events.length} events on selected incident`
+            {selectedEvents.length
+              ? `${selectedEvents.length} event(s) on selected incident`
               : "Waiting for activity"}
           </span>
         </div>
 
         <AgentFlow
-          events={
-            events.length ? events : data.events
-          }
+          events={selectedEvents}
           agents={agents}
           incidents={incidents}
         />
@@ -2566,7 +2568,11 @@ function IncidentDetail({
             <span>HUMAN APPROVAL REQUIRED</span>
             <small>
               {authorityExceeded
-                ? "Approval authority exceeded (local operator policy)."
+                ? `Approval authority exceeded (local operator policy). Risk score ${
+                    incident.confidence != null
+                      ? Math.round(incident.confidence * 100)
+                      : "—"
+                  }/100 exceeds your configured maximum of ${maxApprovableRisk}/100.`
                 : "Approval is recorded in the audit trail."}
             </small>
           </div>
@@ -3548,19 +3554,13 @@ function OperatorPanel({ prefs, updatePrefs, onClose, refresh }) {
           <div>
             <strong>Email notifications</strong>
             <span>
-              Email delivery is not configured in this environment.
+              Email delivery is not configured in this environment. This
+              preference has no effect until a real email backend exists.
             </span>
           </div>
-          <label className="pref-toggle">
-            <input
-              type="checkbox"
-              checked={prefs.emailNotifications}
-              onChange={(e) =>
-                updatePrefs({ emailNotifications: e.target.checked })
-              }
-            />
-            <span>{prefs.emailNotifications ? "ON" : "OFF"}</span>
-          </label>
+          <span className="status-pill unavailable" title="Email delivery is not configured on this backend">
+            <Icon name="lock" /> NOT CONFIGURED
+          </span>
         </div>
         <div className="setting-row">
           <div>
@@ -3578,7 +3578,7 @@ function OperatorPanel({ prefs, updatePrefs, onClose, refresh }) {
                 updatePrefs({ inAppNotifications: e.target.checked })
               }
             />
-            <span>{prefs.inAppNotifications ? "ON" : "OFF"}</span>
+            <span>{prefs.inAppNotifications ? "ENABLED" : "OFF"}</span>
           </label>
         </div>
       </section>
