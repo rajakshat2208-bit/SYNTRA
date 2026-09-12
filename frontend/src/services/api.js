@@ -41,7 +41,12 @@ async function req(path, options) {
     headers: { "Content-Type": "application/json" },
     ...options,
   });
-  if (!res.ok) throw new Error(`API error ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    const text = await res.text();
+    const err = new Error(`API error ${res.status}: ${text}`);
+    err.status = res.status;
+    throw err;
+  }
   return res.json();
 }
 
@@ -62,6 +67,7 @@ export const listAgentEvents = (incidentId) =>
   req(incidentId ? `/agent-events?incident_id=${incidentId}` : "/agent-events");
 export const listAuditApprovals = (limit = 10) =>
   req(`/audit/approvals?limit=${limit}`);
+export const getAdminResetStatus = () => req("/admin/reset/status");
 export const resetAllData = (adminToken) =>
   req("/admin/reset", {
     method: "POST",
