@@ -230,3 +230,46 @@ def create_approval(incident_id: str, approved_by: str, status: str) -> dict:
         )
     return {"id": aid, "incident_id": incident_id, "approved_by": approved_by,
             "timestamp": ts, "status": status}
+
+
+def list_recent_approvals(limit: int = 10) -> list[dict]:
+    """Real approval/rejection audit trail, most recent first. Joins each
+    approval action to its incident's severity/confidence (used as the
+    "risk score" shown in the operator audit history) at the current
+    incident state — no fabricated data.
+    """
+    with db_cursor() as cur:
+        cur.execute(
+            "SELECT a.id, a.incident_id, a.approved_by, a.timestamp, a.status, "
+            "i.title AS incident_title, i.severity AS incident_severity, "
+            "i.confidence AS incident_confidence "
+            "FROM approvals a LEFT JOIN incidents i ON i.id = a.incident_id "
+            "ORDER BY a.timestamp DESC LIMIT ?",
+            (limit,),
+        )
+        rows = cur.fetchall()
+    return [dict(r) for r in rows]
+
+# ---------- Admin / development reset ----------
+
+_RESET_TABLES = (
+    "approvals",
+    "incident_timeline",
+    "assessments",
+    "agent_events",
+    "incidents",
+    "signals",
+)
+
+
+def reset_all_data() -> dict:
+    """Development/demo-only destructive reset. Deletes every row from the
+    operational tables (signals, incidents, agent events, assessments,
+    approvals, timeline) so the dashboard returns to a genuine empty state.
+    Does not touch the schema, the database file itself, or anything
+    outside these tables.
+    """
+    with db_cursor() as cur:
+        for table in _RESET_TABLES:
+            cur.execute(f"DELETE FROM {table}")
+    return {"status": "reset", "tables_cleared": list(_RESET_TABLES)}
