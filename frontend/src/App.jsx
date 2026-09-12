@@ -908,33 +908,34 @@ function AgentFlow({ events, agents, incidents }) {
               aria-pressed={selected === stage.name}
               aria-label={`${stage.name} agent — ${STATE_LABEL[stage.state]}`}
             >
+              <span className="flow-number">
+                {String(stage.number).padStart(2, "0")}
+              </span>
               <div className="flow-node-row">
-                <span className="flow-number">
-                  {String(stage.number).padStart(2, "0")}
-                </span>
                 <div className="flow-node">
                   <Icon name={stage.icon} fill={stage.state === "complete"} />
                   {stage.event && <span className="node-dot" />}
                 </div>
+                {i < stages.length - 1 && (
+                  <div
+                    className={`flow-line ${
+                      stage.state === "error" ||
+                      stages[i + 1].state === "error"
+                        ? "line-error"
+                        : stage.event || stages[i + 1].event
+                        ? "active"
+                        : ""
+                    }`}
+                  >
+                    <i style={{ animationDelay: `${i * 0.3}s` }} />
+                  </div>
+                )}
               </div>
               <span className="flow-name">{stage.name.toUpperCase()}</span>
               <span className="flow-status-label">
                 {STATE_LABEL[stage.state]}
               </span>
             </button>
-            {i < stages.length - 1 && (
-              <div
-                className={`flow-line ${
-                  stage.state === "error" || stages[i + 1].state === "error"
-                    ? "line-error"
-                    : stage.event || stages[i + 1].event
-                    ? "active"
-                    : ""
-                }`}
-              >
-                <i style={{ animationDelay: `${i * 0.3}s` }} />
-              </div>
-            )}
           </div>
         ))}
       </div>
@@ -3437,10 +3438,12 @@ function SettingsModal({ health, prefs, updatePrefs, onClose }) {
 function OperatorPanel({ prefs, updatePrefs, onClose, refresh }) {
   const [audit, setAudit] = useState([]);
   const [auditLoading, setAuditLoading] = useState(true);
+  const [resetConfigured, setResetConfigured] = useState(null); // null = checking
   const [confirmingReset, setConfirmingReset] = useState(false);
   const [resetToken, setResetToken] = useState("");
   const [resetBusy, setResetBusy] = useState(false);
   const [resetError, setResetError] = useState("");
+  const [resetSuccess, setResetSuccess] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -3454,10 +3457,33 @@ function OperatorPanel({ prefs, updatePrefs, onClose, refresh }) {
         if (!cancelled) setAuditLoading(false);
       }
     })();
+    (async () => {
+      try {
+        const status = await getAdminResetStatus();
+        if (!cancelled) setResetConfigured(Boolean(status?.configured));
+      } catch {
+        // Can't reach the status check — treat as unknown/unconfigured
+        // rather than silently pretending it works.
+        if (!cancelled) setResetConfigured(false);
+      }
+    })();
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const openConfirm = () => {
+    setResetError("");
+    setResetSuccess(false);
+    setConfirmingReset(true);
+  };
+
+  const cancelConfirm = () => {
+    setConfirmingReset(false);
+    setResetToken("");
+    setResetError("");
+    setResetSuccess(false);
+  };
 
   const handleReset = async () => {
     setResetBusy(true);
@@ -3466,14 +3492,24 @@ function OperatorPanel({ prefs, updatePrefs, onClose, refresh }) {
       await resetAllData(resetToken);
       await refresh();
       setAudit([]);
-      setConfirmingReset(false);
       setResetToken("");
+      setResetSuccess(true);
     } catch (e) {
-      setResetError(
-        e.message.includes("401") || e.message.includes("403")
-          ? "Reset rejected: missing or incorrect admin reset token."
-          : e.message
-      );
+      if (e.status === 403) {
+        setResetConfigured(false);
+        setResetError(
+          "The administrator reset token (SYNTRA_ADMIN_RESET_TOKEN) is " +
+            "not configured on the backend. Clear Data cannot run until " +
+            "an administrator sets that environment variable on the " +
+            "server."
+        );
+      } else if (e.status === 401) {
+        setResetError(
+          "That admin reset token was rejected. Check the value and try again."
+        );
+      } else {
+        setResetError(`Reset failed: ${e.message}`);
+      }
     } finally {
       setResetBusy(false);
     }
@@ -3635,6 +3671,26 @@ function OperatorPanel({ prefs, updatePrefs, onClose, refresh }) {
 
       <section className="operator-section">
         <h3>System Controls</h3>
+
+        <div className="reset-status-line">
+          <span
+            className={`reset-status-dot ${
+              resetConfigured === null
+                ? "checking"
+                : resetConfigured
+                ? "on"
+                : "off"
+            }`}
+          />
+          <span>
+            {resetConfigured === null
+              ? "Checking whether Clear Data is configured on this server…"
+              : resetConfigured
+              ? "Clear Data is configured on this server."
+              : "Clear Data is NOT configured on this server (SYNTRA_ADMIN_RESET_TOKEN is unset)."}
+          </span>
+        </div>
+
         {!confirmingReset ? (
           <div className="setting-row">
             <div>
@@ -3647,7 +3703,8 @@ function OperatorPanel({ prefs, updatePrefs, onClose, refresh }) {
             <button
               className="button reject"
               type="button"
-              onClick={() => setConfirmingReset(true)}
+              onClick={openConfirm}
+              disabled={resetConfigured === null}
             >
               <Icon name="delete" /> CLEAR DATA
             </button>
@@ -3661,45 +3718,63 @@ function OperatorPanel({ prefs, updatePrefs, onClose, refresh }) {
               <li>All agent events</li>
               <li>All approval / audit records</li>
             </ul>
-            <label className="reset-token-field">
-              <span>Admin reset token</span>
-              <input
-                type="password"
-                autoComplete="off"
-                value={resetToken}
-                onChange={(e) => setResetToken(e.target.value)}
-                placeholder="Required to authorize this reset"
-              />
-            </label>
-            <small className="modal-note-inline">
-              This token is entered here only — it is never stored in the
-              app's code or bundled into the frontend build. The backend
-              rejects the reset if it's missing or incorrect.
-            </small>
-            {resetError && (
-              <p className="reset-error">{resetError}</p>
+
+            {resetSuccess ? (
+              <div className="reset-success">
+                <Icon name="verified" /> Data cleared successfully. The
+                dashboard has been refreshed to its empty state.
+              </div>
+            ) : resetConfigured === false ? (
+              <p className="reset-error">
+                The administrator reset token
+                (<code>SYNTRA_ADMIN_RESET_TOKEN</code>) is not configured
+                on the backend. Clear Data is unavailable until an
+                administrator sets that environment variable on the
+                server — there is nothing you can enter here to work
+                around this.
+              </p>
+            ) : (
+              <>
+                <label className="reset-token-field">
+                  <span>Admin reset token</span>
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    value={resetToken}
+                    onChange={(e) => setResetToken(e.target.value)}
+                    placeholder="Required to authorize this reset"
+                  />
+                </label>
+                <small className="modal-note-inline">
+                  This token is entered here only — it is never stored in
+                  the app's code or bundled into the frontend build. The
+                  backend rejects the reset if it's missing or incorrect.
+                </small>
+                {resetError && (
+                  <p className="reset-error">{resetError}</p>
+                )}
+              </>
             )}
+
             <div className="approval-actions">
               <button
                 className="button"
                 type="button"
-                onClick={() => {
-                  setConfirmingReset(false);
-                  setResetToken("");
-                  setResetError("");
-                }}
+                onClick={cancelConfirm}
                 disabled={resetBusy}
               >
-                CANCEL
+                {resetSuccess ? "CLOSE" : "CANCEL"}
               </button>
-              <button
-                className="button reject"
-                type="button"
-                onClick={handleReset}
-                disabled={resetBusy || !resetToken}
-              >
-                {resetBusy ? "CLEARING…" : "CONFIRM CLEAR DATA"}
-              </button>
+              {!resetSuccess && resetConfigured !== false && (
+                <button
+                  className="button reject"
+                  type="button"
+                  onClick={handleReset}
+                  disabled={resetBusy || !resetToken}
+                >
+                  {resetBusy ? "CLEARING…" : "CONFIRM CLEAR DATA"}
+                </button>
+              )}
             </div>
           </div>
         )}
