@@ -15,3 +15,10 @@ CORS_ORIGINS = os.getenv(
     "SYNTRA_CORS_ORIGINS",
     "http://localhost:5173,https://syntra-vert-nine.vercel.app",
 ).split(",")
+
+# Destructive admin/reset protection. Empty by default = admin reset is
+# disabled (fails closed). Set SYNTRA_ADMIN_RESET_TOKEN on the server
+# (Render env vars, or a local .env that is gitignored) to enable it.
+# Never put this in a VITE_* variable — anything prefixed VITE_ is bundled
+# into the public frontend JavaScript.
+ADMIN_RESET_TOKEN = os.getenv("SYNTRA_ADMIN_RESET_TOKEN", "")
