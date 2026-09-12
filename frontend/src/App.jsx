@@ -265,6 +265,28 @@ const ICONS = {
   chevron_down: () => (
     <polyline points="6,9 12,15 18,9" strokeLinejoin="round" />
   ),
+  delete: () => (
+    <>
+      <path d="M5.5 7.5 h13 l-1 12.5 a1.5 1.5 0 0 1 -1.5 1.4 h-8 a1.5 1.5 0 0 1 -1.5 -1.4 Z" strokeLinejoin="round" />
+      <line x1="3.5" y1="7.5" x2="20.5" y2="7.5" />
+      <path d="M9 7.5 V4.8 A1 1 0 0 1 10 3.8 h4 a1 1 0 0 1 1 1 v2.7" />
+      <line x1="10" y1="11" x2="10" y2="16.5" />
+      <line x1="14" y1="11" x2="14" y2="16.5" />
+    </>
+  ),
+  lock: () => (
+    <>
+      <rect x="5.5" y="10.5" width="13" height="9.5" rx="1.6" />
+      <path d="M8 10.5 V7.3 a4 4 0 0 1 8 0 v3.2" />
+      <circle cx="12" cy="15" r="1.1" fill="currentColor" stroke="none" />
+    </>
+  ),
+  mail: () => (
+    <>
+      <rect x="3.5" y="5.5" width="17" height="13" rx="1.6" />
+      <polyline points="4,6.5 12,13 20,6.5" strokeLinejoin="round" />
+    </>
+  ),
 };
 
 function Icon({ name, fill = false }) {
@@ -289,6 +311,31 @@ function Icon({ name, fill = false }) {
 
 function Badge({ children, tone = "neutral" }) {
   return <span className={`badge badge-${tone}`}>{children}</span>;
+}
+
+function CloseButton({ onClose }) {
+  return (
+    <button
+      type="button"
+      className="close-button"
+      onClick={onClose}
+      aria-label="Close details"
+    >
+      <Icon name="close" />
+    </button>
+  );
+}
+
+/** Calls onClose when Escape is pressed, only while `active` is true. */
+function useEscapeToClose(active, onClose) {
+  useEffect(() => {
+    if (!active) return undefined;
+    const handler = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [active, onClose]);
 }
 
 /**
@@ -482,6 +529,9 @@ const DEFAULT_PREFS = {
   reducedMotion: false,
   autoRefresh: true,
   refreshInterval: 10,
+  emailNotifications: true,
+  inAppNotifications: true,
+  maxApprovableRisk: 85,
 };
 
 function loadPreferences() {
@@ -541,7 +591,7 @@ function LoadingState({ label = "Loading" }) {
   );
 }
 
-function SystemHeader({ health, onNavigate, signals, incidents, notifications, onJumpToSignal, onJumpToIncident }) {
+function SystemHeader({ health, onNavigate, signals, incidents, notifications, onJumpToSignal, onJumpToIncident, onOperator }) {
   const ok = health?.status === "ok";
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -704,7 +754,12 @@ function SystemHeader({ health, onNavigate, signals, incidents, notifications, o
             </div>
           )}
         </div>
-        <button className="icon-button" title="Operator" type="button">
+        <button
+          className="icon-button"
+          title="Operator"
+          type="button"
+          onClick={onOperator}
+        >
           <Icon name="account_circle" />
         </button>
       </div>
@@ -791,6 +846,7 @@ const AGENT_FALLBACK_ROLE = {
 
 function AgentFlow({ events, agents, incidents }) {
   const [selected, setSelected] = useState(null);
+  useEscapeToClose(Boolean(selected), () => setSelected(null));
 
   const latest = useMemo(() => {
     const m = {};
@@ -852,12 +908,14 @@ function AgentFlow({ events, agents, incidents }) {
               aria-pressed={selected === stage.name}
               aria-label={`${stage.name} agent — ${STATE_LABEL[stage.state]}`}
             >
-              <span className="flow-number">
-                {String(stage.number).padStart(2, "0")}
-              </span>
-              <div className="flow-node">
-                <Icon name={stage.icon} fill={stage.state === "complete"} />
-                {stage.event && <span className="node-dot" />}
+              <div className="flow-node-row">
+                <span className="flow-number">
+                  {String(stage.number).padStart(2, "0")}
+                </span>
+                <div className="flow-node">
+                  <Icon name={stage.icon} fill={stage.state === "complete"} />
+                  {stage.event && <span className="node-dot" />}
+                </div>
               </div>
               <span className="flow-name">{stage.name.toUpperCase()}</span>
               <span className="flow-status-label">
@@ -885,8 +943,11 @@ function AgentFlow({ events, agents, incidents }) {
         {selectedStage ? (
           <>
             <div className="agent-detail-head">
-              <span className="eyebrow">AGENT ACTIVITY</span>
-              <h4>{selectedStage.name} Agent</h4>
+              <div>
+                <span className="eyebrow">AGENT ACTIVITY</span>
+                <h4>{selectedStage.name} Agent</h4>
+              </div>
+              <CloseButton onClose={() => setSelected(null)} />
             </div>
             <p className="agent-role-text">{selectedStage.role}</p>
 
@@ -1223,7 +1284,10 @@ function AssessmentPanel({
   events,
   onApprove,
   onReject,
+  onClose,
   busy,
+  authorityExceeded,
+  maxApprovableRisk,
 }) {
   if (!incident) {
     return (
@@ -1258,9 +1322,12 @@ function AssessmentPanel({
             </Badge>
           )}
         </div>
-        <Badge tone={tone}>
-          {(incident.severity || "unclassified").toUpperCase()}
-        </Badge>
+        <div className="assessment-head-actions">
+          <Badge tone={tone}>
+            {(incident.severity || "unclassified").toUpperCase()}
+          </Badge>
+          <CloseButton onClose={onClose} />
+        </div>
       </div>
 
       <div className="assessment-scroll">
@@ -1414,7 +1481,9 @@ function AssessmentPanel({
           <div>
             <span>HUMAN APPROVAL REQUIRED</span>
             <small>
-              SYNTRA proposes; an operator decides.
+              {authorityExceeded
+                ? "Approval authority exceeded (local operator policy)."
+                : "SYNTRA proposes; an operator decides."}
             </small>
           </div>
 
@@ -1430,12 +1499,21 @@ function AssessmentPanel({
 
             <button
               className="button approve"
-              disabled={busy}
+              disabled={busy || authorityExceeded}
               onClick={onApprove}
               type="button"
+              title={
+                authorityExceeded
+                  ? `This incident's risk score exceeds your configured approval authority (max ${maxApprovableRisk}/100).`
+                  : undefined
+              }
             >
               <Icon name="verified" />{" "}
-              {busy ? "PROCESSING" : "APPROVE RESPONSE"}
+              {busy
+                ? "PROCESSING"
+                : authorityExceeded
+                ? "AUTHORITY EXCEEDED"
+                : "APPROVE RESPONSE"}
             </button>
           </div>
         </div>
@@ -1478,7 +1556,7 @@ function DemoScenarioButton({ onResult }) {
   );
 }
 
-function CommandCenter({ data, refresh }) {
+function CommandCenter({ data, refresh, maxApprovableRisk }) {
   const { health, signals, incidents, agents, events } = data;
   const [selectedId, setSelectedId] = useState(
     incidents[0]?.id || null
@@ -1486,17 +1564,25 @@ function CommandCenter({ data, refresh }) {
   const [selected, setSelected] = useState(null);
   const [selectedEvents, setSelectedEvents] = useState([]);
   const [busy, setBusy] = useState(false);
+  const hasAutoSelected = useRef(Boolean(incidents[0]?.id));
 
   const handleDemoResult = async (result) => {
     await refresh();
     if (result?.incident_id) {
       setSelectedId(result.incident_id);
+      hasAutoSelected.current = true;
     }
   };
 
+  const closeDetail = useCallback(() => {
+    setSelectedId(null);
+  }, []);
+  useEscapeToClose(Boolean(selectedId), closeDetail);
+
   useEffect(() => {
-    if (!selectedId && incidents[0]) {
+    if (!hasAutoSelected.current && !selectedId && incidents[0]) {
       setSelectedId(incidents[0].id);
+      hasAutoSelected.current = true;
     }
   }, [incidents, selectedId]);
 
@@ -1534,8 +1620,17 @@ function CommandCenter({ data, refresh }) {
     (s) => s.severity === "critical"
   ).length;
 
+  const riskScore100 =
+    selected?.confidence != null
+      ? Math.round(selected.confidence * 100)
+      : null;
+  const authorityExceeded =
+    riskScore100 != null &&
+    maxApprovableRisk != null &&
+    riskScore100 > maxApprovableRisk;
+
   const approve = async () => {
-    if (!selected) return;
+    if (!selected || authorityExceeded) return;
 
     setBusy(true);
 
@@ -1678,7 +1773,10 @@ function CommandCenter({ data, refresh }) {
           events={selectedEvents}
           onApprove={approve}
           onReject={reject}
+          onClose={closeDetail}
           busy={busy}
+          authorityExceeded={authorityExceeded}
+          maxApprovableRisk={maxApprovableRisk}
         />
       </div>
 
@@ -1836,6 +1934,7 @@ function SignalsPage({ data, refresh, focusId }) {
     focusId || data.signals[0]?.id || null
   );
   const [query, setQuery] = useState("");
+  const hasAutoSelected = useRef(Boolean(focusId || data.signals[0]?.id));
 
   const selected =
     data.signals.find((s) => s.id === selectedId) ||
@@ -1849,9 +1948,15 @@ function SignalsPage({ data, refresh, focusId }) {
       .includes(query.toLowerCase())
   );
 
+  const closeDetail = useCallback(() => {
+    setSelectedId(null);
+  }, []);
+  useEscapeToClose(Boolean(selectedId), closeDetail);
+
   useEffect(() => {
-    if (!selectedId && data.signals[0]) {
+    if (!hasAutoSelected.current && !selectedId && data.signals[0]) {
       setSelectedId(data.signals[0].id);
+      hasAutoSelected.current = true;
     }
   }, [data.signals, selectedId]);
 
@@ -1859,6 +1964,7 @@ function SignalsPage({ data, refresh, focusId }) {
     if (focusId) {
       setSelectedId(focusId);
       setQuery("");
+      hasAutoSelected.current = true;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusId]);
@@ -1950,13 +2056,13 @@ function SignalsPage({ data, refresh, focusId }) {
           </div>
         </div>
 
-        <SignalDetail signal={selected} />
+        <SignalDetail signal={selected} onClose={closeDetail} />
       </div>
     </div>
   );
 }
 
-function SignalDetail({ signal }) {
+function SignalDetail({ signal, onClose }) {
   if (!signal) {
     return (
       <div className="detail-panel">
@@ -1978,9 +2084,12 @@ function SignalDetail({ signal }) {
           <h2>{signal.id}</h2>
         </div>
 
-        <Badge tone={severityTone(signal.severity)}>
-          {signal.status}
-        </Badge>
+        <div className="detail-head-actions">
+          <Badge tone={severityTone(signal.severity)}>
+            {signal.status}
+          </Badge>
+          <CloseButton onClose={onClose} />
+        </div>
       </div>
 
       <div className="detail-body">
@@ -2046,7 +2155,7 @@ function SignalDetail({ signal }) {
   );
 }
 
-function IncidentsPage({ data, refresh, focusId }) {
+function IncidentsPage({ data, refresh, focusId, maxApprovableRisk }) {
   const [selectedId, setSelectedId] = useState(
     focusId || data.incidents[0]?.id || null
   );
@@ -2055,6 +2164,7 @@ function IncidentsPage({ data, refresh, focusId }) {
   const [events, setEvents] = useState([]);
   const [timeline, setTimeline] = useState([]);
   const [busy, setBusy] = useState(false);
+  const hasAutoSelected = useRef(Boolean(focusId || data.incidents[0]?.id));
 
   const filtered = data.incidents.filter((i) =>
     `${i.id} ${i.title} ${i.location || ""} ${
@@ -2064,9 +2174,15 @@ function IncidentsPage({ data, refresh, focusId }) {
       .includes(query.toLowerCase())
   );
 
+  const closeDetail = useCallback(() => {
+    setSelectedId(null);
+  }, []);
+  useEscapeToClose(Boolean(selectedId), closeDetail);
+
   useEffect(() => {
-    if (!selectedId && filtered[0]) {
+    if (!hasAutoSelected.current && !selectedId && filtered[0]) {
       setSelectedId(filtered[0].id);
+      hasAutoSelected.current = true;
     }
   }, [filtered, selectedId]);
 
@@ -2074,6 +2190,7 @@ function IncidentsPage({ data, refresh, focusId }) {
     if (focusId) {
       setSelectedId(focusId);
       setQuery("");
+      hasAutoSelected.current = true;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusId]);
@@ -2099,6 +2216,15 @@ function IncidentsPage({ data, refresh, focusId }) {
       }
     })();
   }, [selectedId]);
+
+  const riskScore100 =
+    selected?.confidence != null
+      ? Math.round(selected.confidence * 100)
+      : null;
+  const authorityExceeded =
+    riskScore100 != null &&
+    maxApprovableRisk != null &&
+    riskScore100 > maxApprovableRisk;
 
   const act = async (fn) => {
     if (!selected) return;
@@ -2193,8 +2319,13 @@ function IncidentsPage({ data, refresh, focusId }) {
           events={events}
           timeline={timeline}
           busy={busy}
-          onApprove={() => act(approveIncident)}
+          onApprove={() => {
+            if (!authorityExceeded) act(approveIncident);
+          }}
           onReject={() => act(rejectIncident)}
+          onClose={closeDetail}
+          authorityExceeded={authorityExceeded}
+          maxApprovableRisk={maxApprovableRisk}
         />
       </div>
     </div>
@@ -2209,6 +2340,9 @@ function IncidentDetail({
   busy,
   onApprove,
   onReject,
+  onClose,
+  authorityExceeded,
+  maxApprovableRisk,
 }) {
   if (!incident) {
     return (
@@ -2247,11 +2381,14 @@ function IncidentDetail({
           )}
         </div>
 
-        <Badge
-          tone={severityTone(incident.severity)}
-        >
-          {incident.status}
-        </Badge>
+        <div className="detail-head-actions">
+          <Badge
+            tone={severityTone(incident.severity)}
+          >
+            {incident.status}
+          </Badge>
+          <CloseButton onClose={onClose} />
+        </div>
       </div>
 
       <div className="detail-body">
@@ -2427,7 +2564,9 @@ function IncidentDetail({
           <div>
             <span>HUMAN APPROVAL REQUIRED</span>
             <small>
-              Approval is recorded in the audit trail.
+              {authorityExceeded
+                ? "Approval authority exceeded (local operator policy)."
+                : "Approval is recorded in the audit trail."}
             </small>
           </div>
 
@@ -2443,11 +2582,20 @@ function IncidentDetail({
 
             <button
               className="button approve"
-              disabled={busy}
+              disabled={busy || authorityExceeded}
               onClick={onApprove}
               type="button"
+              title={
+                authorityExceeded
+                  ? `This incident's risk score exceeds your configured approval authority (max ${maxApprovableRisk}/100).`
+                  : undefined
+              }
             >
-              APPROVE RESPONSE
+              {busy
+                ? "PROCESSING"
+                : authorityExceeded
+                ? "AUTHORITY EXCEEDED"
+                : "APPROVE RESPONSE"}
             </button>
           </div>
         </div>
@@ -3278,6 +3426,288 @@ function SettingsModal({ health, prefs, updatePrefs, onClose }) {
   );
 }
 
+/**
+ * Local development operator identity + preferences. Notification and
+ * approval-authority settings persist via the same localStorage-backed
+ * usePreferences() hook as System Settings. Audit history is fetched live
+ * from the real /api/audit/approvals endpoint (backed by the existing
+ * approvals table) — never fabricated. Clear Data calls the real backend
+ * reset endpoint; nothing here just clears local React state.
+ */
+function OperatorPanel({ prefs, updatePrefs, onClose, refresh }) {
+  const [audit, setAudit] = useState([]);
+  const [auditLoading, setAuditLoading] = useState(true);
+  const [confirmingReset, setConfirmingReset] = useState(false);
+  const [resetToken, setResetToken] = useState("");
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetError, setResetError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await listAuditApprovals(10);
+        if (!cancelled) setAudit(rows);
+      } catch {
+        if (!cancelled) setAudit([]);
+      } finally {
+        if (!cancelled) setAuditLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleReset = async () => {
+    setResetBusy(true);
+    setResetError("");
+    try {
+      await resetAllData(resetToken);
+      await refresh();
+      setAudit([]);
+      setConfirmingReset(false);
+      setResetToken("");
+    } catch (e) {
+      setResetError(
+        e.message.includes("401") || e.message.includes("403")
+          ? "Reset rejected: missing or incorrect admin reset token."
+          : e.message
+      );
+    } finally {
+      setResetBusy(false);
+    }
+  };
+
+  return (
+    <Modal title="Operator" icon="account_circle" onClose={onClose}>
+      <section className="operator-section">
+        <h3>User Identity</h3>
+        <div className="operator-identity">
+          <div>
+            <span>Name</span>
+            <strong>SYNTRA Operator</strong>
+          </div>
+          <div>
+            <span>Email</span>
+            <strong>operator@syntra.local</strong>
+          </div>
+          <div>
+            <span>Role</span>
+            <strong>Operations Supervisor</strong>
+          </div>
+        </div>
+        <div className="modal-note">
+          <Icon name="info" />
+          <span>
+            Local development operator — not backed by real
+            authentication.
+          </span>
+        </div>
+      </section>
+
+      <section className="operator-section">
+        <h3>Notification Preferences</h3>
+        <div className="setting-row">
+          <div>
+            <strong>Email notifications</strong>
+            <span>
+              Email delivery is not configured in this environment.
+            </span>
+          </div>
+          <label className="pref-toggle">
+            <input
+              type="checkbox"
+              checked={prefs.emailNotifications}
+              onChange={(e) =>
+                updatePrefs({ emailNotifications: e.target.checked })
+              }
+            />
+            <span>{prefs.emailNotifications ? "ON" : "OFF"}</span>
+          </label>
+        </div>
+        <div className="setting-row">
+          <div>
+            <strong>In-app notifications</strong>
+            <span>
+              Controls whether SYNTRA surfaces operational alerts in
+              the notification bell.
+            </span>
+          </div>
+          <label className="pref-toggle">
+            <input
+              type="checkbox"
+              checked={prefs.inAppNotifications}
+              onChange={(e) =>
+                updatePrefs({ inAppNotifications: e.target.checked })
+              }
+            />
+            <span>{prefs.inAppNotifications ? "ON" : "OFF"}</span>
+          </label>
+        </div>
+      </section>
+
+      <section className="operator-section">
+        <h3>Approval Authority</h3>
+        <div className="setting-row">
+          <div>
+            <strong>Maximum risk score approvable</strong>
+            <span>
+              Operator may approve incidents up to this risk score.
+              Incidents above it require a higher authority to approve.
+            </span>
+          </div>
+          <div className="risk-threshold">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              className="risk-threshold-input"
+              value={prefs.maxApprovableRisk}
+              onChange={(e) => {
+                const raw = Number(e.target.value);
+                const clamped = Math.max(
+                  0,
+                  Math.min(100, Number.isNaN(raw) ? 0 : raw)
+                );
+                updatePrefs({ maxApprovableRisk: clamped });
+              }}
+              aria-label="Maximum risk score approvable"
+            />
+            <span>/ 100</span>
+          </div>
+        </div>
+        <div className="modal-note">
+          <Icon name="info" />
+          <span>
+            This is a local operator-policy setting for this development
+            environment, saved in this browser only. It is enforced in
+            the UI, not by the backend — there is no server-side
+            authorization to back it, since no operator/authentication
+            system exists yet.
+          </span>
+        </div>
+      </section>
+
+      <section className="operator-section">
+        <h3>Audit History</h3>
+        {auditLoading ? (
+          <LoadingState label="Loading audit history" />
+        ) : audit.length === 0 ? (
+          <p className="agent-no-event">No approval history recorded.</p>
+        ) : (
+          <ul className="audit-list">
+            {audit.map((a) => (
+              <li key={a.id}>
+                <div>
+                  <strong>{a.incident_id}</strong>
+                  <Badge tone={a.status === "approved" ? "ai" : "critical"}>
+                    {(a.status || "").toUpperCase()}
+                  </Badge>
+                </div>
+                <span>
+                  {formatTime(a.timestamp)} ·{" "}
+                  {a.approved_by || "unknown operator"}
+                  {a.incident_confidence != null &&
+                    ` · risk ${Math.round(a.incident_confidence * 100)}/100`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="operator-section">
+        <h3>Password Change</h3>
+        <div className="setting-row">
+          <div>
+            <strong>Change password</strong>
+            <span>
+              Password management is unavailable because authentication
+              is not configured.
+            </span>
+          </div>
+          <button className="button" type="button" disabled>
+            <Icon name="lock" /> UNAVAILABLE
+          </button>
+        </div>
+      </section>
+
+      <section className="operator-section">
+        <h3>System Controls</h3>
+        {!confirmingReset ? (
+          <div className="setting-row">
+            <div>
+              <strong>Clear Data</strong>
+              <span>
+                Permanently deletes persisted signals, incidents, agent
+                events, and approval/audit records in this environment.
+              </span>
+            </div>
+            <button
+              className="button reject"
+              type="button"
+              onClick={() => setConfirmingReset(true)}
+            >
+              <Icon name="delete" /> CLEAR DATA
+            </button>
+          </div>
+        ) : (
+          <div className="reset-confirm">
+            <p>This will permanently delete:</p>
+            <ul className="plain-list">
+              <li>All persisted signals</li>
+              <li>All incidents</li>
+              <li>All agent events</li>
+              <li>All approval / audit records</li>
+            </ul>
+            <label className="reset-token-field">
+              <span>Admin reset token</span>
+              <input
+                type="password"
+                autoComplete="off"
+                value={resetToken}
+                onChange={(e) => setResetToken(e.target.value)}
+                placeholder="Required to authorize this reset"
+              />
+            </label>
+            <small className="modal-note-inline">
+              This token is entered here only — it is never stored in the
+              app's code or bundled into the frontend build. The backend
+              rejects the reset if it's missing or incorrect.
+            </small>
+            {resetError && (
+              <p className="reset-error">{resetError}</p>
+            )}
+            <div className="approval-actions">
+              <button
+                className="button"
+                type="button"
+                onClick={() => {
+                  setConfirmingReset(false);
+                  setResetToken("");
+                  setResetError("");
+                }}
+                disabled={resetBusy}
+              >
+                CANCEL
+              </button>
+              <button
+                className="button reject"
+                type="button"
+                onClick={handleReset}
+                disabled={resetBusy || !resetToken}
+              >
+                {resetBusy ? "CLEARING…" : "CONFIRM CLEAR DATA"}
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
+    </Modal>
+  );
+}
+
 function App() {
   const [active, setActive] = useState(
     () =>
@@ -3316,7 +3746,10 @@ function App() {
     navigate("incidents");
   };
 
-  const notifications = useMemo(() => computeNotifications(data), [data]);
+  const notifications = useMemo(
+    () => (prefs.inAppNotifications ? computeNotifications(data) : []),
+    [data, prefs.inAppNotifications]
+  );
 
   const refresh = useCallback(async () => {
     const endpoints = [
@@ -3389,7 +3822,12 @@ function App() {
 
   const page =
     active === "incidents" ? (
-      <IncidentsPage data={data} refresh={refresh} focusId={focusIncidentId} />
+      <IncidentsPage
+        data={data}
+        refresh={refresh}
+        focusId={focusIncidentId}
+        maxApprovableRisk={prefs.maxApprovableRisk}
+      />
     ) : active === "signals" ? (
       <SignalsPage data={data} refresh={refresh} focusId={focusSignalId} />
     ) : active === "agents" ? (
@@ -3399,7 +3837,11 @@ function App() {
     ) : active === "history" ? (
       <HistoryPage data={data} />
     ) : (
-      <CommandCenter data={data} refresh={refresh} />
+      <CommandCenter
+        data={data}
+        refresh={refresh}
+        maxApprovableRisk={prefs.maxApprovableRisk}
+      />
     );
 
   return (
@@ -3421,6 +3863,7 @@ function App() {
           notifications={notifications}
           onJumpToSignal={jumpToSignal}
           onJumpToIncident={jumpToIncident}
+          onOperator={() => setModal("operator")}
         />
 
         <main className="content">
@@ -3466,6 +3909,15 @@ function App() {
           prefs={prefs}
           updatePrefs={updatePrefs}
           onClose={() => setModal(null)}
+        />
+      )}
+
+      {modal === "operator" && (
+        <OperatorPanel
+          prefs={prefs}
+          updatePrefs={updatePrefs}
+          onClose={() => setModal(null)}
+          refresh={refresh}
         />
       )}
     </div>
