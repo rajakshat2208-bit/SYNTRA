@@ -1,10 +1,12 @@
-from fastapi import APIRouter, HTTPException
+import secrets
+from fastapi import APIRouter, HTTPException, Header
 from backend.models.schema import SignalCreate, ApprovalRequest
 from backend.services import repository as repo
 from backend.services.orchestrator import process_new_signal
 from backend.agents.supervisor_agent import get_agent_status
 from backend.agents.model_provider import is_ai_enabled
 from backend.demo.scenarios import run_electrical_fire_demo
+from backend import config
 
 router = APIRouter(prefix="/api")
 
@@ -121,3 +123,23 @@ def list_agents():
 @router.get("/agent-events")
 def list_agent_events(incident_id: str | None = None):
     return repo.list_agent_events(incident_id=incident_id)
+
+
+@router.get("/audit/approvals")
+def audit_approvals(limit: int = 10):
+    return repo.list_recent_approvals(limit=limit)
+
+
+@router.post("/admin/reset")
+def admin_reset(x_admin_reset_token: str | None = Header(default=None)):
+    if not config.ADMIN_RESET_TOKEN:
+        raise HTTPException(
+            status_code=403,
+            detail="Admin reset is disabled on this server "
+                   "(SYNTRA_ADMIN_RESET_TOKEN is not configured).",
+        )
+    if not x_admin_reset_token or not secrets.compare_digest(
+        x_admin_reset_token, config.ADMIN_RESET_TOKEN
+    ):
+        raise HTTPException(status_code=401, detail="Invalid or missing admin reset token.")
+    return repo.reset_all_data()
