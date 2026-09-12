@@ -60,5 +60,15 @@ export const runElectricalFireDemo = () =>
 export const listAgents = () => req("/agents");
 export const listAgentEvents = (incidentId) =>
   req(incidentId ? `/agent-events?incident_id=${incidentId}` : "/agent-events");
+export const listAuditApprovals = (limit = 10) =>
+  req(`/audit/approvals?limit=${limit}`);
+export const resetAllData = (adminToken) =>
+  req("/admin/reset", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Reset-Token": adminToken || "",
+    },
+  });
 
 export const __normalizeApiBaseUrl = normalizeApiBaseUrl;
