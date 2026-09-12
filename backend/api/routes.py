@@ -130,6 +130,14 @@ def audit_approvals(limit: int = 10):
     return repo.list_recent_approvals(limit=limit)
 
 
+@router.get("/admin/reset/status")
+def admin_reset_status():
+    """Read-only, no secret exposed — just whether Clear Data is usable at
+    all on this server, so the UI can explain unavailability clearly
+    instead of letting the operator hit a wall after typing a token."""
+    return {"configured": bool(config.ADMIN_RESET_TOKEN)}
+
+
 @router.post("/admin/reset")
 def admin_reset(x_admin_reset_token: str | None = Header(default=None)):
     if not config.ADMIN_RESET_TOKEN:
